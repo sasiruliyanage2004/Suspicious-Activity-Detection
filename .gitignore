@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Models
+*.pt
+*.onnx
+
+# Node
+node_modules/
+dist/
+build/
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# DB
+*.sqlite3
