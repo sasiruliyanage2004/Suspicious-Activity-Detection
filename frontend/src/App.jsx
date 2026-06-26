@@ -10,7 +10,7 @@ function App() {
     const val = parseInt(e.target.value);
     setSensitivity(val);
     try {
-      await fetch('http://127.0.0.1:8001/api/settings/threshold', {
+      await fetch('http://127.0.0.1:8002/api/settings/threshold', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ threshold: val / 100 })
@@ -93,6 +93,7 @@ function App() {
   const getAlertStyle = (behavior) => {
     const lowerBehavior = (behavior || 'unknown').toLowerCase();
     const isWeapon = ['weapon', 'gun', 'knife', 'grenade', 'explosion'].some(w => lowerBehavior.includes(w));
+    const isEmotion = lowerBehavior.includes('emotion');
     
     if (lowerBehavior.includes('fall') || isWeapon || lowerBehavior.includes('fight')) {
       return {
@@ -103,6 +104,16 @@ function App() {
         icon: 'warning',
         bgFill: 'bg-error',
         borderColor: 'border-error/30'
+      };
+    } else if (isEmotion) {
+      return {
+        colorClass: 'text-orange-500',
+        bgClass: 'bg-orange-500/20',
+        borderClass: 'border-orange-500',
+        hoverClass: 'hover:bg-orange-500/5 hover:border-orange-500/40 border-l-orange-500',
+        icon: 'mood_bad',
+        bgFill: 'bg-orange-500',
+        borderColor: 'border-orange-500/30'
       };
     } else if (lowerBehavior.includes('loiter')) {
       return {
@@ -228,7 +239,7 @@ function App() {
                     key={videoKey}
                     className="w-full h-full object-cover brightness-75 group-hover:brightness-90 transition-all duration-700 opacity-90" 
                     alt="Camera feed is starting up... Please wait." 
-                    src={`http://127.0.0.1:8001/video_feed?t=${videoKey}`}
+                    src={`http://127.0.0.1:8002/video_feed?t=${videoKey}`}
                     onError={handleVideoError}
                   />
                 </div>
@@ -280,6 +291,7 @@ function App() {
                     const confidencePercent = Math.round((alert.confidence || 0) * 100);
                     const lowerBehavior = (alert.behavior_type || 'unknown').toLowerCase();
                     const isWeapon = ['weapon', 'gun', 'knife', 'grenade', 'explosion'].some(w => lowerBehavior.includes(w));
+                    const isEmotion = lowerBehavior.includes('emotion');
                     
                     return (
                       <div key={alert.id || index} className={`glass-card p-4 rounded-xl group cursor-pointer transition-all duration-300 border-l-4 ${style.hoverClass}`}>
@@ -299,6 +311,7 @@ function App() {
                             <p className="text-sm text-on-surface-variant mt-1">
                               {lowerBehavior.includes('fall') ? 'Person detected on floor in camera view.' : 
                                isWeapon ? 'High-risk object identified in camera view.' :
+                               isEmotion ? alert.details :
                                lowerBehavior.includes('person') ? 'New person entered the monitored area.' :
                                'Suspicious movement detected in restricted zone.'}
                             </p>

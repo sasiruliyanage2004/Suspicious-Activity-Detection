@@ -12,14 +12,14 @@ import ultralytics
 ultralytics.checks()
 
 --- CELL 2: Download Dataset ---
-# You need a dataset from Roboflow (e.g., CCTV Weapons or Violence)
-# Go to Roboflow.com, find a dataset, click "Download Dataset" -> YOLOv8 format -> Show Download Code.
-# Paste that code here:
+# Paste the code you copied from Roboflow here. It should look exactly like this
+# (but with your real api_key):
 !pip install roboflow
 from roboflow import Roboflow
-rf = Roboflow(api_key="YOUR_API_KEY_HERE")
-project = rf.workspace("your-workspace").project("suspicious-activity")
-dataset = project.version(1).download("yolov8")
+rf = Roboflow(api_key="PASTE_YOUR_API_KEY_HERE")
+project = rf.workspace("maheshchhetri").project("weapon-detection-e6otc")
+version = project.version(4)
+dataset = version.download("yolov8")
 
 --- CELL 3: Train the Model ---
 from ultralytics import YOLO

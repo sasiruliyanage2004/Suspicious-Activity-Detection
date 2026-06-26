@@ -11,6 +11,10 @@ class BehaviorAnalyzer:
         # Weapon state
         self.weapon_alerted = False
         self.last_weapon_alert_time = 0
+        
+        # Emotion state
+        self.emotion_alerted = False
+        self.last_emotion_alert_time = 0
     
     def analyze(self, track_id, bbox, keypoints=None, conf=0.9):
         # Extract center of bounding box
@@ -95,13 +99,6 @@ class BehaviorAnalyzer:
                 cls_id = int(box.cls.item())
                 weapon_type = weapon_results[0].names[cls_id].capitalize()
                 
-                # Filter out mobile phones (tall vertical rectangles)
-                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                width = x2 - x1
-                height = y2 - y1
-                if weapon_type == "Gun" and height > width * 1.5:
-                    continue
-                
                 is_new = not self.weapon_alerted
                 self.weapon_alerted = True
                 self.last_weapon_alert_time = current_time
@@ -113,3 +110,26 @@ class BehaviorAnalyzer:
                     "is_new": is_new
                 }
         return None
+
+    def analyze_emotion(self, dominant_emotion, confidence):
+        current_time = time.time()
+        
+        # Define high stress emotions
+        high_stress = ["angry", "fear", "disgust"]
+        
+        if dominant_emotion in high_stress and confidence > 0.6:
+            is_new = not self.emotion_alerted
+            self.emotion_alerted = True
+            self.last_emotion_alert_time = current_time
+            
+            return {
+                "behavior": "Suspicious Emotion",
+                "confidence": float(confidence),
+                "details": f"High stress emotion detected: {dominant_emotion.upper()} ({confidence*100:.1f}%)",
+                "is_new": is_new
+            }
+        else:
+            # Reset emotion alert after 5 seconds of normal emotion
+            if current_time - self.last_emotion_alert_time > 5.0:
+                self.emotion_alerted = False
+            return None
