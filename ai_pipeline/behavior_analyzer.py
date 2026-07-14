@@ -61,16 +61,27 @@ class BehaviorAnalyzer:
                 # Reset fall alert if they stand back up
                 history["fall_alerted"] = False
 
-        # 2. Loitering Detection
+        # 2. Suspicious Activity (Loitering) Detection
+        last_x, last_y = history["last_pos"]
+        # Calculate squared distance to avoid math.sqrt
+        sq_distance = (cx - last_x)**2 + (cy - last_y)**2
+        
+        if sq_distance > self.movement_threshold**2:
+            # Person has moved significantly, reset the timer and position
+            history["first_seen"] = current_time
+            history["last_pos"] = (cx, cy)
+            history["alerted"] = False
+
         time_spent = current_time - history["first_seen"]
         
-        if time_spent > self.loitering_threshold:
+        # Trigger alert if they stay in the same area for more than 4 seconds
+        if time_spent > 4.0:
             is_new = not history["alerted"]
             history["alerted"] = True
             return {
-                "behavior": "Loitering",
-                "confidence": 0.85,
-                "details": f"Person {track_id} loitering for {time_spent:.1f}s",
+                "behavior": "Suspicious Activity",
+                "confidence": 0.88,
+                "details": f"Person {track_id} detected exhibiting suspicious stationary behavior for {time_spent:.1f}s",
                 "is_new": is_new
             }
         
