@@ -364,12 +364,10 @@ function Dashboard({ token, onLogout }) {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-6 bg-plexus">
-      {/* Floating Dashboard Panel */}
-      <div className="flex w-full h-[92vh] max-w-[1600px] bg-[#0c131f]/80 backdrop-blur-xl border border-[var(--color-cyan)]/20 rounded-[32px] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)]">
-        
-        {/* Left Sidebar */}
-        <div className="w-64 bg-[#0a0f18]/60 border-r border-[var(--color-cyan)]/10 p-4 flex flex-col justify-between rounded-l-[32px] overflow-hidden">
+    <div className="flex h-screen w-full overflow-hidden text-[var(--color-text-main)] font-sans bg-plexus">
+      
+      {/* Left Sidebar - Glass Panel */}
+      <div className="w-64 bg-[#0a0f18]/70 backdrop-blur-2xl border-r border-[var(--color-cyan)]/20 flex flex-col justify-between z-50 shadow-[5px_0_30px_rgba(0,0,0,0.5)]">
         <div className="p-6 pb-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-[var(--color-cyan)]/10 border border-[var(--color-cyan)]/50 flex justify-center items-center">
@@ -399,13 +397,13 @@ function Dashboard({ token, onLogout }) {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col relative z-10 m-3 mr-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-black/40">
         {selectedCamera ? renderSelectedCamera() : renderContent()}
       </div>
 
       {/* Right Sidebar - Analytics & Alerts (Always visible unless in Alerts view full page) */}
       {currentView !== 'Alerts' && currentView !== 'Analytics' && (
-        <div className="w-80 glass-panel m-3 ml-0 border-l-0 rounded-l-none flex flex-col p-4 gap-4 z-50 overflow-y-auto scrollbar-hide">
+        <div className="w-80 bg-[#0a0f18]/70 backdrop-blur-2xl border-l border-[var(--color-cyan)]/20 flex flex-col p-4 gap-4 z-50 overflow-y-auto scrollbar-hide shadow-[-5px_0_30px_rgba(0,0,0,0.5)]">
           <div className="flex justify-between items-center pb-2 border-b border-[var(--color-cyan)]/20">
             <h3 className="text-[11px] font-bold tracking-widest uppercase text-white">AI Security Alerts</h3>
             <span className="text-[10px] text-[var(--color-red)] font-bold">({alerts.length} ACTIVE)</span>
@@ -464,7 +462,6 @@ function Dashboard({ token, onLogout }) {
 
         </div>
       )}
-      </div>
     </div>
   );
 }
