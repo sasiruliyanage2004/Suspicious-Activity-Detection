@@ -364,10 +364,12 @@ function Dashboard({ token, onLogout }) {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden text-[var(--color-text-main)] font-sans">
-      
-      {/* Left Sidebar */}
-      <div className="w-64 glass-panel m-3 mr-0 flex flex-col border-r-0 rounded-r-none relative z-50">
+    <div className="min-h-screen w-full flex items-center justify-center p-6 bg-plexus">
+      {/* Floating Dashboard Panel */}
+      <div className="flex w-full h-[92vh] max-w-[1600px] bg-[#0c131f]/80 backdrop-blur-xl border border-[var(--color-cyan)]/20 rounded-[32px] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+        
+        {/* Left Sidebar */}
+        <div className="w-64 bg-[#0a0f18]/60 border-r border-[var(--color-cyan)]/10 p-4 flex flex-col justify-between rounded-l-[32px] overflow-hidden">
         <div className="p-6 pb-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-[var(--color-cyan)]/10 border border-[var(--color-cyan)]/50 flex justify-center items-center">
@@ -462,6 +464,7 @@ function Dashboard({ token, onLogout }) {
 
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -484,9 +487,9 @@ function AuthScreen({ onLogin }) {
   };
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-[#0a0f18] relative overflow-hidden font-sans">
+    <div className="flex h-screen w-full items-center justify-center bg-plexus relative overflow-hidden font-sans">
       
-      <div className="bg-[#0f1523] rounded-lg w-96 p-8 relative z-10 border border-[#1a2639] shadow-2xl">
+      <div className="bg-[#0f1523]/90 backdrop-blur-md rounded-lg w-96 p-8 relative z-10 border border-[#1a2639] shadow-2xl">
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 rounded-full border border-[var(--color-cyan)] flex justify-center items-center mb-4">
             <Shield className="text-[var(--color-cyan)] w-8 h-8" />

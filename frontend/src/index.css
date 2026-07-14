@@ -14,15 +14,21 @@
 
 body {
     background-color: var(--color-bg-dark);
-    /* Cyber Web Background */
-    background-image: 
-        linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px),
-        radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.08) 0%, transparent 60%);
-    background-size: 50px 50px, 50px 50px, 100% 100%;
     color: var(--color-text-main);
     overflow-x: hidden;
     font-family: 'Inter', sans-serif;
+}
+
+.bg-plexus {
+    background-color: #050a12;
+    background-image: 
+        linear-gradient(30deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(150deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(rgba(0, 240, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.02) 1px, transparent 1px),
+        radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.08) 0%, transparent 70%);
+    background-size: 100px 100px, 100px 100px, 50px 50px, 50px 50px, 100% 100%;
+    background-position: center center;
 }
 
 .glass-panel {
