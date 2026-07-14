@@ -9,6 +9,7 @@ function App() {
   const [videoKey, setVideoKey] = useState(Date.now());
   const [sensitivity, setSensitivity] = useState(65);
   const [currentView, setCurrentView] = useState('Live Feeds');
+  const [selectedCamera, setSelectedCamera] = useState(null);
 
   // Chart Data
   const threatData = [
@@ -210,7 +211,7 @@ function App() {
           {cameras.map((cam, idx) => {
             const isAlert = alerts.length > 0 && alerts[0].camera_id === cam.id && (new Date() - new Date(alerts[0].timestamp)) < 8000;
             return (
-              <div key={cam.id} className={`camera-card flex flex-col group ${isAlert ? 'alert-active' : ''}`}>
+              <div key={cam.id} onClick={() => setSelectedCamera(cam)} className={`camera-card flex flex-col group cursor-pointer hover:shadow-[0_0_20px_rgba(0,240,255,0.2)] ${isAlert ? 'alert-active' : ''}`}>
                 <div className="px-3 py-1.5 bg-[#000] border-b border-[var(--color-cyan)]/20 flex justify-between items-center z-20">
                   <span className="text-[10px] font-bold tracking-widest uppercase text-white opacity-90">{cam.name}</span>
                   <div className="flex gap-1">
@@ -289,6 +290,76 @@ function App() {
     );
   };
 
+  // Render Full Screen Camera if one is selected
+  const renderSelectedCamera = () => {
+    const cam = selectedCamera;
+    const isAlert = alerts.length > 0 && alerts[0].camera_id === cam.id && (new Date() - new Date(alerts[0].timestamp)) < 8000;
+    
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-hidden p-4 relative z-20">
+        <div className="flex justify-between items-center mb-4">
+          <button 
+            onClick={() => setSelectedCamera(null)}
+            className="cyber-button px-4 py-2 rounded flex items-center gap-2 hover:bg-[var(--color-cyan)] hover:text-black font-bold tracking-widest text-sm transition-colors"
+          >
+            ← BACK TO GRID
+          </button>
+          <div className="text-xl font-mono tracking-widest text-white">{timeStr}</div>
+        </div>
+
+        <div className={`camera-card flex-1 flex flex-col w-full h-full ${isAlert ? 'alert-active' : ''}`}>
+           <div className="px-6 py-3 bg-[#000] border-b border-[var(--color-cyan)]/20 flex justify-between items-center z-20">
+              <span className="text-sm font-bold tracking-widest uppercase text-white">{cam.name} - HIGH RESOLUTION FEED</span>
+              <div className="flex items-center gap-4">
+                <span className="w-2 h-2 rounded-full bg-[var(--color-cyan)] animate-pulse"></span>
+                <span className="text-xs font-mono opacity-50">FPS: 30</span>
+              </div>
+           </div>
+           
+           <div className="relative flex-1 bg-black overflow-hidden flex justify-center items-center">
+              <div className="scan-line"></div>
+              <img 
+                key={`${cam.id}-full-${videoKey}`}
+                className="absolute inset-0 w-full h-full object-contain" 
+                alt="Camera Feed" 
+                src={cam.streamUrl}
+                onError={handleVideoError}
+              />
+              
+              <div className="absolute inset-0 pointer-events-none p-8 flex flex-col justify-between">
+                 <div className="flex justify-between items-start">
+                    <div className="w-8 h-8 border-t-4 border-l-4 border-[var(--color-cyan)]/70"></div>
+                    <div className="w-8 h-8 border-t-4 border-r-4 border-[var(--color-cyan)]/70"></div>
+                 </div>
+                 <div className="flex justify-between items-end">
+                    <div className="w-8 h-8 border-b-4 border-l-4 border-[var(--color-cyan)]/70"></div>
+                    <div className="w-8 h-8 border-b-4 border-r-4 border-[var(--color-cyan)]/70"></div>
+                 </div>
+              </div>
+
+              {isAlert && (
+                 <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-[#ff003c40] border-2 border-[var(--color-red)] px-6 py-2 rounded-lg animate-pulse">
+                     <span className="text-lg text-white font-bold tracking-widest">⚠️ CRITICAL THREAT DETECTED ⚠️</span>
+                 </div>
+              )}
+           </div>
+           
+           <div className={`px-6 py-3 bg-[#000] border-t ${isAlert ? 'border-[var(--color-red)]/50' : 'border-[var(--color-cyan)]/20'} flex items-center gap-3 z-20`}>
+              <div className={`w-8 h-8 rounded flex justify-center items-center ${isAlert ? 'bg-[var(--color-red)] text-white' : 'bg-green-500/20 text-green-400'}`}>
+                {isAlert ? <AlertTriangle size={16}/> : <Shield size={16}/>}
+              </div>
+              <div>
+                <div className={`text-xs font-bold tracking-widest uppercase ${isAlert ? 'text-[var(--color-red)]' : 'text-green-400'}`}>
+                  {isAlert ? 'IMMEDIATE ACTION REQUIRED' : 'SECTOR CLEAR'}
+                </div>
+                <div className="text-[10px] font-mono opacity-50 uppercase">Network Status: Online | Latency: 12ms</div>
+              </div>
+           </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-screen w-full overflow-hidden text-[var(--color-text-main)] font-sans">
       
@@ -324,7 +395,7 @@ function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col relative z-10 m-3 mr-0">
-        {renderContent()}
+        {selectedCamera ? renderSelectedCamera() : renderContent()}
       </div>
 
       {/* Right Sidebar - Analytics & Alerts (Always visible unless in Alerts view full page) */}
