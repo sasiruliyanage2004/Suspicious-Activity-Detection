@@ -132,7 +132,7 @@ def generate_frames():
                     last_emotions = emotion_detector.detect_emotions(frame)
                     
                 # 1. Detect & Track
-                pose_results, weapon_results = detector.process_frame(frame)
+                pose_results, weapon_results = detector.process_frame(frame, conf_threshold=GLOBAL_WEAPON_THRESHOLD)
                 
                 # 2. Analyze Weapon Behavior
                 weapon_alert = analyzer.analyze_weapons(weapon_results, threshold=GLOBAL_WEAPON_THRESHOLD)
