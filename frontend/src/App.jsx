@@ -3,6 +3,7 @@ import { LineChart, Line, Tooltip, ResponsiveContainer } from 'recharts';
 
 function App() {
   const [alerts, setAlerts] = useState([]);
+  const [cameras, setCameras] = useState([{ id: 'Cam-01', streamUrl: 'http://127.0.0.1:8002/video_feed', name: '01-Main' }]);
   const [timeStr, setTimeStr] = useState('');
   const [videoKey, setVideoKey] = useState(Date.now());
   const [sensitivity, setSensitivity] = useState(65);
@@ -58,7 +59,16 @@ function App() {
     
     ws.onmessage = (event) => {
       try {
-        const newAlert = JSON.parse(event.data);
+        const message = JSON.parse(event.data);
+        if (message.type === 'new_camera') {
+            setCameras(prev => {
+                if (prev.find(c => c.id === message.camera_id)) return prev;
+                return [...prev, { id: message.camera_id, streamUrl: message.stream_url, name: message.camera_id }];
+            });
+            return;
+        }
+        
+        const newAlert = message;
         if (newAlert && newAlert.behavior_type && newAlert.behavior_type !== 'Unknown') {
           setAlerts(prevAlerts => {
             // Add the new alert to the beginning of the list and keep only 10
@@ -243,56 +253,43 @@ function App() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                {/* Camera 01 - Live Feed */}
-                <div className={`relative aspect-video rounded-2xl border-2 overflow-hidden tech-grid group bg-black flex justify-center items-center ${alerts.length > 0 && ['weapon', 'gun', 'knife', 'grenade', 'explosion', 'fall', 'fight'].some(w => (alerts[0].behavior_type || '').toLowerCase().includes(w)) && (new Date() - new Date(alerts[0].timestamp)) < 8000 ? 'border-error camera-glow-error' : 'border-primary/40 camera-glow'}`}>
-                  <div className="absolute inset-0 z-0">
-                    <img 
-                      key={videoKey}
-                      className="w-full h-full object-cover brightness-75 group-hover:brightness-90 transition-all duration-700 opacity-90" 
-                      alt="Camera feed is starting up... Please wait." 
-                      src={`http://127.0.0.1:8002/video_feed?t=${videoKey}`}
-                      onError={handleVideoError}
-                    />
-                  </div>
-                  <div className="absolute inset-0 pointer-events-none p-4 flex flex-col justify-between z-10">
-                    <div className="flex justify-between items-start">
-                      <div className="bg-black/40 backdrop-blur-md border border-white/10 px-2 py-1 rounded flex items-center gap-2">
-                        <div className="w-2 h-2 bg-error rounded-full animate-pulse-red"></div>
-                        <span className="text-error font-bold text-[10px] tracking-tighter">REC</span>
+                {cameras.map((cam, idx) => (
+                  <div key={cam.id} className={`relative aspect-video rounded-2xl border-2 overflow-hidden tech-grid group bg-black flex justify-center items-center ${alerts.length > 0 && alerts[0].camera_id === cam.id && ['weapon', 'gun', 'knife', 'grenade', 'explosion', 'fall', 'fight'].some(w => (alerts[0].behavior_type || '').toLowerCase().includes(w)) && (new Date() - new Date(alerts[0].timestamp)) < 8000 ? 'border-error camera-glow-error' : 'border-primary/40 camera-glow'}`}>
+                    <div className="absolute inset-0 z-0">
+                      <img 
+                        key={`${cam.id}-${videoKey}`}
+                        className="w-full h-full object-cover brightness-75 group-hover:brightness-90 transition-all duration-700 opacity-90" 
+                        alt={`${cam.name} feed is starting up... Please wait.`} 
+                        src={cam.streamUrl}
+                        onError={handleVideoError}
+                      />
+                    </div>
+                    <div className="absolute inset-0 pointer-events-none p-4 flex flex-col justify-between z-10">
+                      <div className="flex justify-between items-start">
+                        <div className="bg-black/40 backdrop-blur-md border border-white/10 px-2 py-1 rounded flex items-center gap-2">
+                          <div className="w-2 h-2 bg-error rounded-full animate-pulse-red"></div>
+                          <span className="text-error font-bold text-[10px] tracking-tighter">REC</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-end">
+                        <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-primary/20">
+                          <p className="font-mono text-primary/90 text-xs"><span className="opacity-50">Cam:</span> {cam.name}</p>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex justify-between items-end">
-                      <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-primary/20">
-                        <p className="font-mono text-primary/90 text-xs"><span className="opacity-50">Cam:</span> 01-Main</p>
-                      </div>
+                    <div className="absolute inset-x-0 h-[1px] bg-primary/20 shadow-[0_0_15px_rgba(125,211,252,0.5)] top-0 animate-[scan_8s_linear_infinite] z-20"></div>
+                  </div>
+                ))}
+                
+                {/* Fill empty slots with Standby */}
+                {Array.from({ length: Math.max(0, 4 - cameras.length) }).map((_, idx) => (
+                  <div key={`standby-${idx}`} className="relative aspect-video rounded-2xl border-2 border-surface-variant/30 overflow-hidden bg-black flex justify-center items-center group">
+                    <span className="text-on-surface-variant/40 font-mono text-sm group-hover:text-primary/50 transition-colors animate-pulse">STANDBY</span>
+                    <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-surface-variant/30">
+                      <p className="font-mono text-on-surface-variant/60 text-xs">Waiting for connection...</p>
                     </div>
                   </div>
-                  <div className="absolute inset-x-0 h-[1px] bg-primary/20 shadow-[0_0_15px_rgba(125,211,252,0.5)] top-0 animate-[scan_8s_linear_infinite] z-20"></div>
-                </div>
-
-                {/* Camera 02 - Standby */}
-                <div className="relative aspect-video rounded-2xl border-2 border-surface-variant/30 overflow-hidden bg-black flex justify-center items-center group">
-                  <span className="text-on-surface-variant/40 font-mono text-sm group-hover:text-primary/50 transition-colors animate-pulse">Cam-02 : STANDBY</span>
-                  <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-surface-variant/30">
-                    <p className="font-mono text-on-surface-variant/60 text-xs">02-Lobby</p>
-                  </div>
-                </div>
-
-                {/* Camera 03 - Standby */}
-                <div className="relative aspect-video rounded-2xl border-2 border-surface-variant/30 overflow-hidden bg-black flex justify-center items-center group">
-                  <span className="text-on-surface-variant/40 font-mono text-sm group-hover:text-primary/50 transition-colors animate-pulse">Cam-03 : STANDBY</span>
-                  <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-surface-variant/30">
-                    <p className="font-mono text-on-surface-variant/60 text-xs">03-Backdoor</p>
-                  </div>
-                </div>
-
-                {/* Camera 04 - Standby */}
-                <div className="relative aspect-video rounded-2xl border-2 border-surface-variant/30 overflow-hidden bg-black flex justify-center items-center group">
-                  <span className="text-on-surface-variant/40 font-mono text-sm group-hover:text-primary/50 transition-colors animate-pulse">Cam-04 : STANDBY</span>
-                  <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-surface-variant/30">
-                    <p className="font-mono text-on-surface-variant/60 text-xs">04-Parking</p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
             

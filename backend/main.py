@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+import json
 from database import engine, Base
 import routers.alerts as alerts
 
@@ -34,3 +35,20 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/")
 def root():
     return {"message": "Welcome to Suspicious Behavior Detection MVP API"}
+
+from pydantic import BaseModel
+
+class CameraRegister(BaseModel):
+    camera_id: str
+    ip_address: str
+    port: int
+
+@app.post("/api/cameras/register")
+async def register_camera(cam: CameraRegister):
+    msg = {
+        "type": "new_camera",
+        "camera_id": cam.camera_id,
+        "stream_url": f"http://{cam.ip_address}:{cam.port}/video_feed"
+    }
+    await manager.broadcast(json.dumps(msg))
+    return {"status": "success", "message": "Registered"}

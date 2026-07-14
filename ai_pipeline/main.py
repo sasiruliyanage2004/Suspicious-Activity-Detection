@@ -10,7 +10,25 @@ from fer.fer import FER
 import time
 import numpy as np
 
+import threading
+import requests
 app = FastAPI()
+
+def auto_register_camera():
+    while True:
+        try:
+            requests.post("http://127.0.0.1:8000/api/cameras/register", json={
+                "camera_id": "Cam-01",
+                "ip_address": "127.0.0.1",
+                "port": 8002
+            })
+            print("Successfully auto-registered Camera 01 to Backend")
+            break
+        except Exception as e:
+            print("Backend not ready yet, retrying registration in 5s...")
+            time.sleep(5)
+
+threading.Thread(target=auto_register_camera, daemon=True).start()
 
 app.add_middleware(
     CORSMiddleware,
