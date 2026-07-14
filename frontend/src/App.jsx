@@ -245,6 +245,108 @@ function Dashboard({ token, onLogout }) {
               </table>
             </div>
           )}
+
+          {currentView === 'Dashboard' && (
+             <div className="h-full flex flex-col gap-6 p-6">
+                <h2 className="font-headline-md text-primary glow-cyan flex items-center gap-2"><span className="material-symbols-outlined">dashboard</span> System Overview</h2>
+                <div className="grid grid-cols-3 gap-6">
+                   <div className="bg-surface-container-low border border-primary/20 p-6 rounded-lg hud-bracket">
+                      <div className="text-on-surface-variant font-label-caps text-xs tracking-widest uppercase mb-2">Active Nodes</div>
+                      <div className="text-4xl font-data-mono text-primary glow-cyan">{cameras.length}</div>
+                   </div>
+                   <div className="bg-surface-container-low border border-secondary/20 p-6 rounded-lg hud-bracket">
+                      <div className="text-on-surface-variant font-label-caps text-xs tracking-widest uppercase mb-2">Total Alerts (24H)</div>
+                      <div className="text-4xl font-data-mono text-secondary glow-red">{alerts.length}</div>
+                   </div>
+                   <div className="bg-surface-container-low border border-primary/20 p-6 rounded-lg hud-bracket">
+                      <div className="text-on-surface-variant font-label-caps text-xs tracking-widest uppercase mb-2">System Load</div>
+                      <div className="text-4xl font-data-mono text-primary glow-cyan">24%</div>
+                   </div>
+                </div>
+             </div>
+          )}
+
+          {currentView === 'Playback' && (
+             <div className="h-full flex flex-col gap-6 p-6">
+                <h2 className="font-headline-md text-primary glow-cyan flex items-center gap-2"><span className="material-symbols-outlined">history</span> Video Playback & Archive</h2>
+                <div className="flex-1 bg-black border border-primary/20 rounded-lg flex items-center justify-center flex-col gap-4 hud-bracket scanline-container">
+                   <span className="material-symbols-outlined text-6xl text-primary/20">movie</span>
+                   <div className="font-label-caps tracking-widest text-primary/50">ARCHIVE SYSTEM OFFLINE IN EXHIBITION MODE</div>
+                </div>
+                <div className="h-24 bg-surface-container-low border border-primary/20 rounded p-4">
+                   <div className="font-label-caps text-[10px] text-primary mb-2 tracking-widest">TIMELINE (24H)</div>
+                   <div className="w-full h-8 bg-black relative border border-white/10">
+                      <div className="absolute top-0 bottom-0 left-1/4 w-1 bg-secondary animate-pulse"></div>
+                      <div className="absolute top-0 bottom-0 left-1/2 w-1 bg-yellow-500"></div>
+                   </div>
+                </div>
+             </div>
+          )}
+
+          {currentView === 'Analytics' && (
+             <div className="h-full flex flex-col gap-6 p-6 overflow-y-auto">
+                <h2 className="font-headline-md text-primary glow-cyan flex items-center gap-2"><span className="material-symbols-outlined">monitoring</span> System Analytics</h2>
+                <div className="grid grid-cols-2 gap-6 h-80">
+                   <div className="bg-surface-container-low border border-primary/20 p-6 rounded-lg flex flex-col">
+                      <div className="font-label-caps text-xs text-primary tracking-widest mb-4">THREAT LEVELS (WEEKLY)</div>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={threatData}>
+                          <XAxis dataKey="name" stroke="#00f0ff50" fontSize={10} />
+                          <Tooltip contentStyle={{ background: '#0a0e1a', border: '1px solid #00f0ff' }} cursor={{fill: '#00f0ff10'}} />
+                          <Bar dataKey="level" fill="var(--color-secondary)" radius={[4,4,0,0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                   </div>
+                   <div className="bg-surface-container-low border border-primary/20 p-6 rounded-lg flex flex-col">
+                      <div className="font-label-caps text-xs text-primary tracking-widest mb-4">DETECTION HISTORY (24H)</div>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={detectionHistory}>
+                          <XAxis dataKey="time" stroke="#00f0ff50" fontSize={10} />
+                          <Tooltip contentStyle={{ background: '#0a0e1a', border: '1px solid #00f0ff' }} />
+                          <Line type="monotone" dataKey="val1" stroke="var(--color-primary)" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="val2" stroke="var(--color-secondary)" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                   </div>
+                </div>
+             </div>
+          )}
+
+          {currentView === 'Settings' && (
+             <div className="h-full flex flex-col gap-6 p-6">
+                <h2 className="font-headline-md text-primary glow-cyan flex items-center gap-2"><span className="material-symbols-outlined">settings</span> System Configuration</h2>
+                
+                <div className="max-w-2xl bg-surface-container-low border border-primary/20 p-8 rounded-lg hud-bracket flex flex-col gap-8">
+                   
+                   <div>
+                      <h3 className="font-label-caps text-primary tracking-widest mb-2 border-b border-primary/20 pb-2">AI ENGINE PARAMETERS</h3>
+                      <div className="mt-6 flex flex-col gap-2">
+                         <div className="flex justify-between">
+                            <span className="font-data-mono text-sm text-on-surface-variant">Confidence Threshold</span>
+                            <span className="font-data-mono text-sm text-primary">{sensitivity}%</span>
+                         </div>
+                         <input type="range" min="10" max="95" value={sensitivity} onChange={handleSensitivityChange} className="w-full h-1 bg-surface-variant rounded-full appearance-none cursor-pointer accent-primary-fixed-dim mt-2"/>
+                         <p className="text-[10px] text-on-surface-variant/60 font-label-caps mt-2">Higher values reduce false positives but may miss partial threats.</p>
+                      </div>
+                   </div>
+
+                   <div>
+                      <h3 className="font-label-caps text-primary tracking-widest mb-2 border-b border-primary/20 pb-2">NOTIFICATION PROTOCOLS</h3>
+                      <div className="mt-4 flex flex-col gap-4">
+                         <label className="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" defaultChecked className="w-4 h-4 accent-primary bg-surface-variant border-primary/20" />
+                            <span className="font-data-mono text-sm text-on-surface-variant">Push Alerts to Mobile Command</span>
+                         </label>
+                         <label className="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" className="w-4 h-4 accent-primary bg-surface-variant border-primary/20" />
+                            <span className="font-data-mono text-sm text-on-surface-variant">Auto-Dispatch Patrol on Critical</span>
+                         </label>
+                      </div>
+                   </div>
+
+                </div>
+             </div>
+          )}
         </main>
 
         {/* Right Sidebar: Alerts & Charts */}
