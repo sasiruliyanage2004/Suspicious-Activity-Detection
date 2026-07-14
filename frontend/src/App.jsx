@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, BarChart, Bar, Tooltip, ResponsiveContainer, YAxis, XAxis, CartesianGrid } from 'recharts';
+import { LayoutDashboard, Radio, Bell, PlaySquare, BarChart2, HardDrive, Settings, Search, Shield, AlertTriangle, User } from 'lucide-react';
 
 function App() {
   const [alerts, setAlerts] = useState([]);
@@ -7,13 +8,19 @@ function App() {
   const [timeStr, setTimeStr] = useState('');
   const [videoKey, setVideoKey] = useState(Date.now());
   const [sensitivity, setSensitivity] = useState(65);
+  const [currentView, setCurrentView] = useState('Live Feeds');
 
-  const chartData = [
-    { time: '08:00', threats: 2 },
-    { time: '10:00', threats: 5 },
-    { time: '12:00', threats: 1 },
-    { time: '14:00', threats: 8 },
-    { time: '16:00', threats: Math.max(3, alerts.length) },
+  // Chart Data
+  const threatData = [
+    { name: 'Mon', level: 45 }, { name: 'Tue', level: 75 }, { name: 'Wed', level: 30 },
+    { name: 'Thu', level: 90 }, { name: 'Fri', level: 60 }, { name: 'Sat', level: 25 },
+    { name: 'Sun', level: Math.min(100, alerts.length * 10) }
+  ];
+
+  const detectionHistory = [
+    { time: '0h', val1: 800, val2: 400 }, { time: '6hrs', val1: 1200, val2: 800 },
+    { time: '12hrs', val1: 600, val2: 1500 }, { time: '18hrs', val1: 1800, val2: 900 },
+    { time: '24hrs', val1: 1000, val2: 1200 }
   ];
 
   const handleSensitivityChange = async (e) => {
@@ -31,22 +38,18 @@ function App() {
   };
 
   const handleVideoError = () => {
-    // Retry loading the video feed every 2 seconds if the server is still starting up
-    setTimeout(() => {
-      setVideoKey(Date.now());
-    }, 2000);
+    setTimeout(() => setVideoKey(Date.now()), 2000);
   };
 
-  // Use WebSockets for Instant Alerts
+  // WebSockets for Instant Alerts
   useEffect(() => {
-    // Initial fetch to load existing alerts
     const fetchAlerts = async () => {
       try {
         const response = await fetch('http://127.0.0.1:8000/alerts/');
         if (response.ok) {
           const data = await response.json();
           const validAlerts = data.filter(a => a && a.behavior_type && a.behavior_type !== 'Unknown');
-          setAlerts(validAlerts.slice(-10).reverse());
+          setAlerts(validAlerts.slice(-20).reverse());
         }
       } catch (error) {
         console.error("Error fetching alerts:", error);
@@ -54,9 +57,7 @@ function App() {
     };
     fetchAlerts();
 
-    // Connect to WebSocket for real-time updates
     const ws = new WebSocket('ws://127.0.0.1:8000/ws/alerts');
-    
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
@@ -68,340 +69,326 @@ function App() {
             return;
         }
         
-        const newAlert = message;
-        if (newAlert && newAlert.behavior_type && newAlert.behavior_type !== 'Unknown') {
-          setAlerts(prevAlerts => {
-            // Add the new alert to the beginning of the list and keep only 10
-            const updated = [newAlert, ...prevAlerts];
-            return updated.slice(0, 10);
-          });
+        if (message && message.behavior_type && message.behavior_type !== 'Unknown') {
+          setAlerts(prev => [message, ...prev].slice(0, 50));
         }
       } catch (e) {
-        console.error("WebSocket message parse error:", e);
+        console.error("WS error:", e);
       }
     };
-
-    return () => {
-      ws.close();
-    };
+    return () => ws.close();
   }, []);
 
-  // Update clock every second
+  // Clock
   useEffect(() => {
     const clockInterval = setInterval(() => {
       const now = new Date();
-      setTimeStr(now.toLocaleTimeString('en-US', { hour12: true }) + ' ' + now.toLocaleDateString());
+      setTimeStr(now.toLocaleTimeString('en-GB', { hour12: false }) + ' GMT');
     }, 1000);
     return () => clearInterval(clockInterval);
   }, []);
 
-  // Format timestamp nicely
   const formatTimeAgo = (timestampStr) => {
     if (!timestampStr) return '';
     const timeStr = timestampStr.endsWith('Z') ? timestampStr : timestampStr + 'Z';
-    const alertTime = new Date(timeStr);
-    const now = new Date();
-    const diffSec = Math.max(0, Math.floor((now - alertTime) / 1000));
-    
+    const diffSec = Math.max(0, Math.floor((new Date() - new Date(timeStr)) / 1000));
     if (diffSec < 60) return `Just now`;
     if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
     return `${Math.floor(diffSec / 3600)}h ago`;
   };
 
-  // Helper to determine styling based on behavior
-  const getAlertStyle = (behavior) => {
-    const lowerBehavior = (behavior || 'unknown').toLowerCase();
-    const isWeapon = ['weapon', 'gun', 'knife', 'grenade', 'explosion'].some(w => lowerBehavior.includes(w));
-    const isEmotion = lowerBehavior.includes('emotion');
-    
-    if (lowerBehavior.includes('fall') || isWeapon || lowerBehavior.includes('fight')) {
-      return {
-        colorClass: 'text-error',
-        bgClass: 'bg-error/20',
-        borderClass: 'border-error',
-        hoverClass: 'hover:bg-error/5 hover:border-error/40 border-l-error ring-error/20',
-        icon: 'warning',
-        bgFill: 'bg-error',
-        borderColor: 'border-error/30'
-      };
-    } else if (isEmotion) {
-      return {
-        colorClass: 'text-orange-500',
-        bgClass: 'bg-orange-500/20',
-        borderClass: 'border-orange-500',
-        hoverClass: 'hover:bg-orange-500/5 hover:border-orange-500/40 border-l-orange-500',
-        icon: 'mood_bad',
-        bgFill: 'bg-orange-500',
-        borderColor: 'border-orange-500/30'
-      };
-    } else if (lowerBehavior.includes('loiter')) {
-      return {
-        colorClass: 'text-amber-400',
-        bgClass: 'bg-amber-400/20',
-        borderClass: 'border-amber-400',
-        hoverClass: 'hover:bg-amber-400/5 hover:border-amber-400/40 border-l-amber-400',
-        icon: 'schedule',
-        bgFill: 'bg-amber-400',
-        borderColor: 'border-amber-400/30'
-      };
-    } else {
-      return {
-        colorClass: 'text-primary',
-        bgClass: 'bg-primary/20',
-        borderClass: 'border-primary',
-        hoverClass: 'hover:bg-primary/5 hover:border-primary/40 border-l-primary',
-        icon: 'info',
-        bgFill: 'bg-primary',
-        borderColor: 'border-primary/30'
-      };
+  const navItems = [
+    { name: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+    { name: 'Live Feeds', icon: <Radio size={18} /> },
+    { name: 'Alerts', icon: <Bell size={18} /> },
+    { name: 'Playback', icon: <PlaySquare size={18} /> },
+    { name: 'Analytics', icon: <BarChart2 size={18} /> },
+    { name: 'Devices', icon: <HardDrive size={18} /> },
+    { name: 'Settings', icon: <Settings size={18} /> }
+  ];
+
+  const renderContent = () => {
+    if (currentView === 'Alerts') {
+      return (
+        <div className="flex-1 overflow-y-auto scrollbar-hide p-6">
+          <h2 className="text-2xl text-[var(--color-cyan)] font-bold mb-6 flex items-center gap-2">
+            <Bell className="text-[var(--color-red)]"/> Alert History Database
+          </h2>
+          <div className="glass-panel overflow-hidden">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-[#00f0ff1a] text-[var(--color-cyan)]">
+                <tr>
+                  <th className="p-4">Time</th>
+                  <th className="p-4">Camera Node</th>
+                  <th className="p-4">Threat Type</th>
+                  <th className="p-4">Confidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                {alerts.map((a, i) => (
+                  <tr key={i} className="border-b border-[var(--color-cyan)]/10 hover:bg-[#00f0ff0a] transition-colors">
+                    <td className="p-4 opacity-80">{new Date(a.timestamp || Date.now()).toLocaleString()}</td>
+                    <td className="p-4 font-mono text-[var(--color-cyan)]">{a.camera_id}</td>
+                    <td className="p-4">
+                       <span className={`px-2 py-1 rounded text-xs border ${['weapon', 'gun', 'knife'].some(w => (a.behavior_type || '').toLowerCase().includes(w)) ? 'border-[var(--color-red)] text-[var(--color-red)] bg-[#ff003c20]' : 'border-yellow-400 text-yellow-400 bg-yellow-400/20'}`}>
+                         {a.behavior_type}
+                       </span>
+                    </td>
+                    <td className="p-4">{(a.confidence * 100).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {alerts.length === 0 && <p className="p-8 text-center opacity-50">No alerts recorded yet.</p>}
+          </div>
+        </div>
+      );
     }
+
+    if (currentView === 'Analytics') {
+      return (
+        <div className="flex-1 p-6 flex flex-col gap-6">
+          <h2 className="text-2xl text-[var(--color-cyan)] font-bold flex items-center gap-2">
+            <BarChart2 /> System Analytics Overview
+          </h2>
+          <div className="grid grid-cols-2 gap-6 h-64">
+            <div className="glass-panel p-4 flex flex-col">
+              <h3 className="text-sm opacity-70 mb-4 font-mono uppercase">Threat Levels (Weekly)</h3>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={threatData}>
+                  <XAxis dataKey="name" stroke="#00f0ff50" fontSize={10} />
+                  <Tooltip contentStyle={{ background: '#0a0e1a', border: '1px solid #00f0ff' }} cursor={{fill: '#00f0ff10'}} />
+                  <Bar dataKey="level" fill="var(--color-red)" radius={[4,4,0,0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="glass-panel p-4 flex flex-col">
+              <h3 className="text-sm opacity-70 mb-4 font-mono uppercase">Detection History (24hrs)</h3>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={detectionHistory}>
+                  <XAxis dataKey="time" stroke="#00f0ff50" fontSize={10} />
+                  <Tooltip contentStyle={{ background: '#0a0e1a', border: '1px solid #00f0ff' }} />
+                  <Line type="monotone" dataKey="val1" stroke="var(--color-cyan)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="val2" stroke="#4ade80" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Default: Live Feeds
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-hidden p-4">
+        {/* Top Header inside main content */}
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-light tracking-wide text-white">UI Dashboard <span className="text-[10px] bg-[#00f0ff20] text-[var(--color-cyan)] border border-[var(--color-cyan)] px-2 py-0.5 rounded ml-2 align-middle font-bold tracking-widest">ONLINE</span></h2>
+          <div className="flex items-center gap-6">
+            <div className="text-xl font-mono tracking-widest text-white">{timeStr}</div>
+            <div className="flex items-center gap-3 glass-panel px-4 py-1.5 border-[var(--color-cyan)]/30">
+              <span className="text-xs opacity-70">AI Confidence</span>
+              <span className="text-green-400 font-mono font-bold">{sensitivity}%</span>
+              <input 
+                type="range" min="10" max="99" value={sensitivity} onChange={handleSensitivityChange}
+                className="w-24 h-1 bg-[#00f0ff30] rounded-lg appearance-none cursor-pointer accent-[var(--color-cyan)]"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button className="cyber-button w-8 h-8 rounded-full flex items-center justify-center text-[var(--color-red)] border-[var(--color-red)]/50 hover:bg-[var(--color-red)]/10"><Bell size={14}/></button>
+              <button className="cyber-button w-8 h-8 rounded-full flex items-center justify-center text-[var(--color-cyan)] border-[var(--color-cyan)]/50"><Radio size={14}/></button>
+              <div className="flex items-center gap-2 ml-2 cyber-button px-3 py-1 rounded">
+                <User size={14} className="text-[var(--color-cyan)]"/>
+                <span className="text-sm opacity-80">User: Admin</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Camera Grid */}
+        <div className="grid grid-cols-3 gap-4 flex-1 min-h-0 pb-2">
+          {cameras.map((cam, idx) => {
+            const isAlert = alerts.length > 0 && alerts[0].camera_id === cam.id && (new Date() - new Date(alerts[0].timestamp)) < 8000;
+            return (
+              <div key={cam.id} className={`camera-card flex flex-col group ${isAlert ? 'alert-active' : ''}`}>
+                <div className="px-3 py-1.5 bg-[#000] border-b border-[var(--color-cyan)]/20 flex justify-between items-center z-20">
+                  <span className="text-[10px] font-bold tracking-widest uppercase text-white opacity-90">{cam.name}</span>
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-cyan)]"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-cyan)] opacity-50"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-cyan)] opacity-20"></span>
+                  </div>
+                </div>
+                <div className="relative flex-1 bg-black overflow-hidden flex justify-center items-center">
+                  <div className="scan-line"></div>
+                  <img 
+                    key={`${cam.id}-${videoKey}`}
+                    className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
+                    alt="Camera Feed" 
+                    src={cam.streamUrl}
+                    onError={handleVideoError}
+                  />
+                  {/* Overlay crosshairs */}
+                  <div className="absolute inset-0 pointer-events-none p-4 flex flex-col justify-between">
+                     <div className="flex justify-between items-start">
+                        <div className="w-4 h-4 border-t-2 border-l-2 border-[var(--color-cyan)]/50"></div>
+                        <div className="w-4 h-4 border-t-2 border-r-2 border-[var(--color-cyan)]/50"></div>
+                     </div>
+                     <div className="flex justify-between items-end">
+                        <div className="w-4 h-4 border-b-2 border-l-2 border-[var(--color-cyan)]/50"></div>
+                        <div className="w-4 h-4 border-b-2 border-r-2 border-[var(--color-cyan)]/50"></div>
+                     </div>
+                  </div>
+                  {/* Mockup specific overlay */}
+                  {isAlert && (
+                     <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-[#ff003c20] border border-[var(--color-red)] px-3 py-1 rounded">
+                         <span className="text-[10px] text-[var(--color-red)] font-bold tracking-widest">THREAT ACTIVE</span>
+                     </div>
+                  )}
+                </div>
+                <div className={`px-3 py-2 bg-[#000] border-t ${isAlert ? 'border-[var(--color-red)]/50' : 'border-[var(--color-cyan)]/20'} flex items-center gap-2 z-20`}>
+                  <div className={`w-6 h-6 rounded flex justify-center items-center ${isAlert ? 'bg-[var(--color-red)]/20 text-[var(--color-red)]' : 'bg-green-500/20 text-green-400'}`}>
+                    {isAlert ? <AlertTriangle size={12}/> : <User size={12}/>}
+                  </div>
+                  <div>
+                    <div className={`text-[9px] font-bold tracking-widest uppercase ${isAlert ? 'text-[var(--color-red)]' : 'text-green-400'}`}>
+                      {isAlert ? 'THREAT DETECTED' : 'SECURE / CLEAR'}
+                    </div>
+                    <div className="text-[8px] font-mono opacity-50 uppercase">Status: {isAlert ? 'Alert!' : 'Secure'}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          
+          {/* Standby Slots to fill 3x3 depending on camera count */}
+          {Array.from({ length: Math.max(0, 9 - cameras.length) }).map((_, idx) => (
+            <div key={`standby-${idx}`} className="camera-card flex flex-col border-[var(--color-cyan)]/10">
+              <div className="px-3 py-1.5 bg-[#000] border-b border-[var(--color-cyan)]/10 flex justify-between items-center z-20">
+                <span className="text-[10px] font-bold tracking-widest uppercase text-white opacity-40">STANDBY - 0{idx + cameras.length + 1}</span>
+                <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white opacity-10"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-white opacity-10"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-white opacity-10"></span>
+                </div>
+              </div>
+              <div className="relative flex-1 bg-[#050810] flex justify-center items-center border border-[var(--color-cyan)]/5 m-4">
+                <span className="text-xs font-mono opacity-20 tracking-widest">NO SIGNAL</span>
+              </div>
+              <div className="px-3 py-2 bg-[#000] border-t border-[var(--color-cyan)]/10 flex items-center gap-2 z-20 opacity-30">
+                 <div className="w-6 h-6 rounded bg-gray-500/20"></div>
+                 <div>
+                    <div className="text-[9px] font-bold tracking-widest uppercase">OFFLINE</div>
+                    <div className="text-[8px] font-mono opacity-50 uppercase">Status: Disconnected</div>
+                 </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   return (
-    <>
-      <header className="flex justify-between items-center w-full px-6 h-16 fixed top-0 z-50 bg-surface-container/60 dark:bg-surface-container/60 backdrop-blur-xl border-b border-primary/10 shadow-[0_0_30px_rgba(125,211,252,0.05)]">
-        <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-primary">security</span>
-          <span className="text-xl font-headline font-semibold text-primary tracking-tight">CCTV Security Center</span>
-        </div>
-        <nav className="hidden md:flex items-center gap-8 font-body text-on-surface tracking-tight">
-          <a className="text-primary font-bold border-b-2 border-primary pb-1" href="#/">Live View</a>
-          <a className="text-on-surface-variant hover:text-primary transition-colors" href="#/">Alert History</a>
-          <a className="text-on-surface-variant hover:text-primary transition-colors" href="#/">Camera Nodes</a>
-          <a className="text-on-surface-variant hover:text-primary transition-colors" href="#/">Analytics</a>
-          <a className="text-on-surface-variant hover:text-primary transition-colors" href="#/">System Health</a>
-        </nav>
-        <div className="flex items-center gap-4">
-          <div className="relative group">
-            <span className="material-symbols-outlined text-on-surface-variant p-2 rounded-full hover:bg-primary/10 transition-all duration-300 cursor-pointer active:scale-95">notifications</span>
-            <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
-          </div>
-          <span className="material-symbols-outlined text-on-surface-variant p-2 rounded-full hover:bg-primary/10 transition-all duration-300 cursor-pointer active:scale-95">settings</span>
-          <div className="flex items-center gap-2 pl-2 border-l border-primary/10">
-            <span className="material-symbols-outlined text-primary text-3xl">account_circle</span>
+    <div className="flex h-screen w-full overflow-hidden text-[var(--color-text-main)] font-sans">
+      
+      {/* Left Sidebar */}
+      <div className="w-64 glass-panel m-3 mr-0 flex flex-col border-r-0 rounded-r-none relative z-50">
+        <div className="p-6 pb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-[var(--color-cyan)]/10 border border-[var(--color-cyan)]/50 flex justify-center items-center">
+              <Shield className="text-[var(--color-cyan)]"/>
+            </div>
+            <div>
+              <h1 className="font-bold text-sm tracking-widest text-white">AI SECURITY</h1>
+              <h2 className="text-[9px] text-[var(--color-cyan)] opacity-70 tracking-widest uppercase">Command Center</h2>
+            </div>
           </div>
         </div>
-      </header>
+        
+        <div className="flex-1 py-6 px-3 flex flex-col gap-1">
+          {navItems.map((item) => (
+            <button 
+              key={item.name}
+              onClick={() => setCurrentView(item.name)}
+              className={`cyber-button w-full flex items-center gap-4 px-4 py-3 rounded-lg text-sm text-left ${currentView === item.name ? 'active' : 'border-transparent hover:border-[var(--color-cyan)]/20'}`}
+            >
+              <span className={`${currentView === item.name ? 'text-[var(--color-cyan)]' : 'opacity-60'}`}>{item.icon}</span>
+              <span className={currentView === item.name ? 'font-bold' : 'opacity-70'}>{item.name}</span>
+              {item.name === 'Live Feeds' && <span className="ml-auto text-[9px] bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded">Active</span>}
+              {item.name === 'Alerts' && alerts.length > 0 && <span className="ml-auto text-[9px] bg-[var(--color-red)]/20 text-[var(--color-red)] border border-[var(--color-red)]/30 px-1.5 py-0.5 rounded">{alerts.length} New</span>}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      <aside className="fixed left-0 top-16 bottom-0 flex flex-col z-40 bg-surface-container-low/60 dark:bg-surface-container-low/60 backdrop-blur-2xl border-r border-primary/10 w-64 hidden xl:flex">
-        <div className="p-6 flex flex-col items-center border-b border-primary/5">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 mb-3 overflow-hidden">
-            <img className="w-full h-full object-cover" alt="Operator" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAr_qYTskroEce7JweBv7-DAvcAUfX7axGLlCdr8k-g5SiDL9h_LIMrKJUXhZCEisARqfijIR5HEDmJm5Yp0G5tqmqJL3ibrIujpNDl9a7hQ3jdTVv0AtWAB4jBRjEg2v4_suuqwDfEftXBxgx0QeLjux9KvcPR7jxM5N1N-mtmjv0EEl25anrap71L0HdokkWMsGECfohsrgK0A5jsJhUU4WIeeD5Dk_Tw0nVo64eODBIQX6Z4j9NwmH6px9OsbmgkHVZUgZZUhlY"/>
-          </div>
-          <h3 className="text-on-surface font-bold">Operator Alpha</h3>
-          <p className="text-on-surface-variant text-xs">Sector 7G</p>
-        </div>
-        <nav className="flex-1 py-4 font-body text-sm overflow-y-auto scrollbar-hide">
-          <div className="flex items-center gap-3 bg-primary/20 text-primary border-r-4 border-primary px-4 py-3 cursor-pointer">
-            <span className="material-symbols-outlined">videocam</span>
-            <span>Live View</span>
-          </div>
-          <div className="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-variant/30 hover:backdrop-brightness-125 transition-all hover:translate-x-1 duration-200 cursor-pointer">
-            <span className="material-symbols-outlined">warning</span>
-            <span>Alert History</span>
-          </div>
-          <div className="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-variant/30 hover:backdrop-brightness-125 transition-all hover:translate-x-1 duration-200 cursor-pointer">
-            <span className="material-symbols-outlined">router</span>
-            <span>Camera Nodes</span>
-          </div>
-          <div className="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-variant/30 hover:backdrop-brightness-125 transition-all hover:translate-x-1 duration-200 cursor-pointer">
-            <span className="material-symbols-outlined">monitoring</span>
-            <span>Analytics</span>
-          </div>
-          <div className="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-variant/30 hover:backdrop-brightness-125 transition-all hover:translate-x-1 duration-200 cursor-pointer">
-            <span className="material-symbols-outlined">health_and_safety</span>
-            <span>System Health</span>
-          </div>
-        </nav>
-        <div className="p-6">
-          <button className="w-full py-3 bg-error/20 border border-error/50 text-error rounded-xl font-bold hover:bg-error hover:text-on-error transition-all active:scale-95">
-            Emergency Lockdown
-          </button>
-        </div>
-      </aside>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col relative z-10 m-3 mr-0">
+        {renderContent()}
+      </div>
 
-      <main className="pt-24 pb-12 px-4 xl:ml-64 transition-all">
-        <div className="w-full mx-auto">
-          <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-            <div className="xl:col-span-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <h2 className="text-2xl font-headline font-bold text-on-surface">Sector 01 - Main Entrance</h2>
-                  <span className="px-3 py-1 bg-primary/10 border border-primary/20 text-primary text-xs rounded-full uppercase tracking-widest font-bold">4K Crystal Stream</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-xl border border-primary/20 backdrop-blur-md">
-                    <span className="text-on-surface-variant text-sm font-bold">AI Sensitivity:</span>
-                    <input 
-                      type="range" 
-                      min="10" 
-                      max="100" 
-                      value={sensitivity} 
-                      onChange={handleSensitivityChange}
-                      className="w-24 accent-primary"
-                    />
-                    <span className="text-primary font-mono text-sm w-8">{sensitivity}%</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="p-2 glass-card rounded-lg hover:bg-primary/20 transition-all text-on-surface-variant hover:text-primary">
-                      <span className="material-symbols-outlined">fullscreen</span>
-                    </button>
-                    <button className="p-2 glass-card rounded-lg hover:bg-primary/20 transition-all text-on-surface-variant hover:text-primary">
-                      <span className="material-symbols-outlined">more_vert</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {cameras.map((cam, idx) => (
-                  <div key={cam.id} className={`relative aspect-video rounded-2xl border-2 overflow-hidden tech-grid group bg-black flex justify-center items-center ${alerts.length > 0 && alerts[0].camera_id === cam.id && ['weapon', 'gun', 'knife', 'grenade', 'explosion', 'fall', 'fight'].some(w => (alerts[0].behavior_type || '').toLowerCase().includes(w)) && (new Date() - new Date(alerts[0].timestamp)) < 8000 ? 'border-error camera-glow-error' : 'border-primary/40 camera-glow'}`}>
-                    <div className="absolute inset-0 z-0">
-                      <img 
-                        key={`${cam.id}-${videoKey}`}
-                        className="w-full h-full object-cover brightness-75 group-hover:brightness-90 transition-all duration-700 opacity-90" 
-                        alt={`${cam.name} feed is starting up... Please wait.`} 
-                        src={cam.streamUrl}
-                        onError={handleVideoError}
-                      />
-                    </div>
-                    <div className="absolute inset-0 pointer-events-none p-4 flex flex-col justify-between z-10">
-                      <div className="flex justify-between items-start">
-                        <div className="bg-black/40 backdrop-blur-md border border-white/10 px-2 py-1 rounded flex items-center gap-2">
-                          <div className="w-2 h-2 bg-error rounded-full animate-pulse-red"></div>
-                          <span className="text-error font-bold text-[10px] tracking-tighter">REC</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-end">
-                        <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-primary/20">
-                          <p className="font-mono text-primary/90 text-xs"><span className="opacity-50">Cam:</span> {cam.name}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="absolute inset-x-0 h-[1px] bg-primary/20 shadow-[0_0_15px_rgba(125,211,252,0.5)] top-0 animate-[scan_8s_linear_infinite] z-20"></div>
-                  </div>
-                ))}
-                
-                {/* Fill empty slots with Standby */}
-                {Array.from({ length: Math.max(0, 4 - cameras.length) }).map((_, idx) => (
-                  <div key={`standby-${idx}`} className="relative aspect-video rounded-2xl border-2 border-surface-variant/30 overflow-hidden bg-black flex justify-center items-center group">
-                    <span className="text-on-surface-variant/40 font-mono text-sm group-hover:text-primary/50 transition-colors animate-pulse">STANDBY</span>
-                    <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-surface-variant/30">
-                      <p className="font-mono text-on-surface-variant/60 text-xs">Waiting for connection...</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            <div className="flex flex-col h-[70vh] gap-4">
-              <div className="glass-card p-4 rounded-xl border-primary/20 h-40 shrink-0">
-                <h2 className="text-sm font-headline font-bold text-on-surface mb-2">Live Threat Analytics</h2>
-                <div className="h-24 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <Line type="monotone" dataKey="threats" stroke="#7dd3fc" strokeWidth={2} dot={{ r: 3, fill: '#7dd3fc' }} />
-                      <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 21, 36, 0.9)', border: '1px solid rgba(125, 211, 252, 0.2)', borderRadius: '8px', color: '#7dd3fc' }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div className="glass-card p-4 rounded-xl flex items-center justify-between border-primary/20">
-                <h2 className="text-xl font-headline font-bold text-on-surface">Recent Security Alerts</h2>
-                <span className="material-symbols-outlined text-primary/50">filter_list</span>
-              </div>
-              <div className="space-y-4 flex-1 overflow-y-auto scrollbar-hide">
-                {alerts.length === 0 ? (
-                  <div className="p-4 text-center text-on-surface-variant border border-dashed border-primary/20 rounded-xl">
-                    No recent alerts. Monitoring active.
-                  </div>
-                ) : (
-                  alerts.map((alert, index) => {
-                    const style = getAlertStyle(alert.behavior_type);
-                    const confidencePercent = Math.round((alert.confidence || 0) * 100);
-                    const lowerBehavior = (alert.behavior_type || 'unknown').toLowerCase();
-                    const isWeapon = ['weapon', 'gun', 'knife', 'grenade', 'explosion'].some(w => lowerBehavior.includes(w));
-                    const isEmotion = lowerBehavior.includes('emotion');
-                    
-                    return (
-                      <div key={alert.id || index} className={`glass-card p-4 rounded-xl group cursor-pointer transition-all duration-300 border-l-4 ${style.hoverClass}`}>
-                        <div className="flex items-start gap-4">
-                          <div className={`w-12 h-12 rounded-lg flex items-center justify-center border ${style.bgClass} ${style.borderColor} ${style.colorClass}`}>
-                            <span className="material-symbols-outlined">{style.icon}</span>
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start">
-                              <h3 className={`font-bold capitalize ${style.colorClass}`}>
-                                {(alert.behavior_type || 'unknown').toLowerCase().includes('detect') 
-                                  ? (alert.behavior_type || 'unknown').replace('_', ' ') 
-                                  : `${(alert.behavior_type || 'unknown').replace('_', ' ')} Detected`}
-                              </h3>
-                              <span className="text-xs text-on-surface-variant">{formatTimeAgo(alert.timestamp)}</span>
-                            </div>
-                            <p className="text-sm text-on-surface-variant mt-1">
-                              {lowerBehavior.includes('fall') ? 'Person detected on floor in camera view.' : 
-                               isWeapon ? 'High-risk object identified in camera view.' :
-                               isEmotion ? alert.details :
-                               lowerBehavior.includes('person') ? 'New person entered the monitored area.' :
-                               'Suspicious movement detected in restricted zone.'}
-                            </p>
-                            <div className="mt-3 flex items-center gap-3">
-                              <div className="flex-1 bg-surface-container-highest h-1 rounded-full overflow-hidden">
-                                <div className={`${style.bgFill} h-full`} style={{ width: `${confidencePercent}%` }}></div>
-                              </div>
-                              <span className={`text-xs font-mono font-bold ${style.colorClass}`}>{confidencePercent}%</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-              <button className="w-full py-4 text-primary text-sm font-bold border border-dashed border-primary/20 rounded-xl hover:bg-primary/5 transition-all shrink-0">
-                View All Incident Reports
-              </button>
-            </div>
+      {/* Right Sidebar - Analytics & Alerts (Always visible unless in Alerts view full page) */}
+      {currentView !== 'Alerts' && currentView !== 'Analytics' && (
+        <div className="w-80 glass-panel m-3 ml-0 border-l-0 rounded-l-none flex flex-col p-4 gap-4 z-50 overflow-y-auto scrollbar-hide">
+          <div className="flex justify-between items-center pb-2 border-b border-[var(--color-cyan)]/20">
+            <h3 className="text-[11px] font-bold tracking-widest uppercase text-white">AI Security Alerts</h3>
+            <span className="text-[10px] text-[var(--color-red)] font-bold">({alerts.length} ACTIVE)</span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
-            <div className="glass-card p-6 rounded-2xl border-primary/10">
-              <p className="text-on-surface-variant text-sm mb-2">Total Active Nodes</p>
-              <div className="flex items-end gap-3">
-                <span className="text-4xl font-bold text-on-surface">1</span>
-                <span className="text-primary text-xs font-bold mb-1">Local Cam-01</span>
-              </div>
-            </div>
-            <div className="glass-card p-6 rounded-2xl border-primary/10">
-              <p className="text-on-surface-variant text-sm mb-2">Average Threat Level</p>
-              <div className="flex items-end gap-3">
-                <span className="text-4xl font-bold text-on-surface">Low</span>
-                <div className="w-24 h-2 bg-surface-container-highest rounded-full mb-2.5">
-                  <div className="bg-primary h-full w-1/4 rounded-full"></div>
+          
+          <div className="flex flex-col gap-3">
+            {alerts.slice(0,4).map((alert, idx) => {
+              const isHigh = ['weapon', 'gun', 'knife', 'grenade'].some(w => (alert.behavior_type || '').toLowerCase().includes(w));
+              return (
+                <div key={idx} className={`p-3 rounded-lg border bg-[#000] flex gap-3 ${isHigh ? 'border-[var(--color-red)]/50' : 'border-yellow-500/30'}`}>
+                  <div className={`mt-1 ${isHigh ? 'text-[var(--color-red)]' : 'text-yellow-500'}`}>
+                    {isHigh ? <AlertTriangle size={18}/> : <AlertTriangle size={18}/>}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] opacity-70 tracking-widest">{new Date(alert.timestamp).toLocaleTimeString('en-GB', {hour12:false})} - {alert.camera_id}</span>
+                    </div>
+                    <div className={`text-xs font-bold uppercase tracking-widest ${isHigh ? 'text-[var(--color-red)]' : 'text-yellow-500'}`}>
+                      {alert.behavior_type}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div className="glass-card p-6 rounded-2xl border-primary/10">
-              <p className="text-on-surface-variant text-sm mb-2">System Uptime</p>
-              <div className="flex items-end gap-3">
-                <span className="text-4xl font-bold text-on-surface">99.9%</span>
-                <span className="material-symbols-outlined text-primary mb-1">check_circle</span>
-              </div>
-            </div>
-            <div className="glass-card p-6 rounded-2xl border-primary/10 relative overflow-hidden group">
-              <div className="relative z-10">
-                <p className="text-on-surface-variant text-sm mb-2">Database Status</p>
-                <div className="flex items-end gap-3">
-                  <span className="text-4xl font-bold text-on-surface">{alerts.length}</span>
-                  <span className="text-xs text-on-surface-variant mb-1">Alerts Logged</span>
-                </div>
-              </div>
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary/20 group-hover:h-2 transition-all">
-                <div className="h-full bg-primary" style={{ width: '70%' }}></div>
-              </div>
-            </div>
+              );
+            })}
+            {alerts.length === 0 && <div className="text-xs opacity-50 text-center py-4">No recent alerts</div>}
           </div>
+
+          <div className="mt-4 pt-4 border-t border-[var(--color-cyan)]/20">
+             <div className="flex justify-between items-center mb-4">
+                <h3 className="text-[11px] font-bold tracking-widest uppercase text-white">Threat Levels</h3>
+                <span className="text-[9px] text-[var(--color-red)] opacity-70">Bar Chart</span>
+             </div>
+             <div className="h-24">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={threatData}>
+                    <Bar dataKey="level" fill="#ff003c" radius={[2,2,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+             </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-[var(--color-cyan)]/20">
+             <div className="flex justify-between items-center mb-4">
+                <h3 className="text-[11px] font-bold tracking-widest uppercase text-white">Detection History</h3>
+                <span className="text-[9px] text-[var(--color-cyan)] opacity-70">24hrs</span>
+             </div>
+             <div className="h-24">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={detectionHistory}>
+                    <Line type="monotone" dataKey="val1" stroke="#00f0ff" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="val2" stroke="#4ade80" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+             </div>
+          </div>
+
         </div>
-      </main>
-    </>
+      )}
+    </div>
   );
 }
 

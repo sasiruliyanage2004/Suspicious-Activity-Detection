@@ -2,60 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --color-cyan: #00f0ff;
+    --color-red: #ff003c;
+    --color-bg-dark: #070B14;
+    --color-bg-panel: rgba(14, 21, 37, 0.7);
+    --color-text-main: #e0e8f0;
+  }
+}
+
 body {
-    background: radial-gradient(circle at center, #0d1117 0%, #0a0e1a 100%);
-    color: #e0e8f0;
+    background-color: var(--color-bg-dark);
+    /* Cyber Web Background */
+    background-image: 
+        linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+        radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.08) 0%, transparent 60%);
+    background-size: 50px 50px, 50px 50px, 100% 100%;
+    color: var(--color-text-main);
     overflow-x: hidden;
+    font-family: 'Inter', sans-serif;
 }
 
-.glass-card {
-    background: rgba(15, 21, 36, 0.6);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(125, 211, 252, 0.1);
+.glass-panel {
+    background: var(--color-bg-panel);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    border-radius: 12px;
 }
 
-.tech-grid {
-    background-size: 40px 40px;
-    background-image: linear-gradient(to right, rgba(125, 211, 252, 0.03) 1px, transparent 1px),
-                      linear-gradient(to bottom, rgba(125, 211, 252, 0.03) 1px, transparent 1px);
+.cyber-button {
+    background: transparent;
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    color: var(--color-text-main);
+    transition: all 0.3s ease;
 }
 
-@keyframes pulse-red {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+.cyber-button.active, .cyber-button:hover {
+    background: rgba(0, 240, 255, 0.1);
+    border-color: var(--color-cyan);
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+    color: var(--color-cyan);
 }
 
-.animate-pulse-red {
-    animation: pulse-red 2s infinite;
+.camera-card {
+    background: #000;
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
 }
 
-.material-symbols-outlined {
-    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+.camera-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    box-shadow: inset 0 0 30px rgba(0, 240, 255, 0.05);
+    pointer-events: none;
+    z-index: 10;
 }
 
-.camera-glow {
-    box-shadow: inset 0 0 40px rgba(125, 211, 252, 0.05), 0 0 20px rgba(125, 211, 252, 0.1);
+.camera-card.alert-active {
+    border-color: var(--color-red);
+    animation: pulse-border-red 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-border-red {
+    0% { border-color: rgba(255, 0, 60, 0.4); box-shadow: inset 0 0 20px rgba(255, 0, 60, 0.1), 0 0 10px rgba(255, 0, 60, 0.2); }
+    50% { border-color: var(--color-red); box-shadow: inset 0 0 50px rgba(255, 0, 60, 0.3), 0 0 30px rgba(255, 0, 60, 0.6); }
+    100% { border-color: rgba(255, 0, 60, 0.4); box-shadow: inset 0 0 20px rgba(255, 0, 60, 0.1), 0 0 10px rgba(255, 0, 60, 0.2); }
+}
+
+@keyframes scan-line {
+    0% { top: -10%; opacity: 0; }
+    10% { opacity: 0.5; }
+    90% { opacity: 0.5; }
+    100% { top: 110%; opacity: 0; }
+}
+
+.scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: var(--color-cyan);
+    box-shadow: 0 0 15px var(--color-cyan);
+    animation: scan-line 4s linear infinite;
+    z-index: 20;
+    pointer-events: none;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
     display: none;
 }
-
-@keyframes scan {
-    0% { top: 0%; opacity: 0; }
-    10% { opacity: 0.8; }
-    90% { opacity: 0.8; }
-    100% { top: 100%; opacity: 0; }
-}
-
-@keyframes pulse-border-red {
-    0% { border-color: rgba(239, 68, 68, 0.4); box-shadow: inset 0 0 40px rgba(239, 68, 68, 0.05), 0 0 20px rgba(239, 68, 68, 0.2); }
-    50% { border-color: rgba(239, 68, 68, 1); box-shadow: inset 0 0 60px rgba(239, 68, 68, 0.2), 0 0 40px rgba(239, 68, 68, 0.8); }
-    100% { border-color: rgba(239, 68, 68, 0.4); box-shadow: inset 0 0 40px rgba(239, 68, 68, 0.05), 0 0 20px rgba(239, 68, 68, 0.2); }
-}
-
-.camera-glow-error {
-    animation: pulse-border-red 1.2s ease-in-out infinite;
-}
-
