@@ -102,3 +102,38 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
     display: none;
 }
+
+@keyframes pulse-glow {
+    0%, 100% { opacity: 1; filter: brightness(100%) drop-shadow(0 0 2px rgba(0, 219, 233, 0.5)); }
+    50% { opacity: 0.8; filter: brightness(120%) drop-shadow(0 0 8px rgba(0, 219, 233, 0.8)); }
+}
+@keyframes scanline-vertical {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+}
+.scanline-container::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, transparent 50%, rgba(0, 240, 255, 0.05) 50%);
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 10;
+}
+.glow-cyan { text-shadow: 0 0 10px rgba(0, 240, 255, 0.5); }
+.glow-red { text-shadow: 0 0 10px rgba(255, 82, 92, 0.5); }
+
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 219, 233, 0.3); border-radius: 2px; }
+
+.hud-bracket::before {
+    content: ''; position: absolute; top: 0; left: 0; width: 10px; height: 10px;
+    border-top: 2px solid #00f0ff; border-left: 2px solid #00f0ff;
+    z-index: 20; pointer-events: none;
+}
+.hud-bracket::after {
+    content: ''; position: absolute; bottom: 0; right: 0; width: 10px; height: 10px;
+    border-bottom: 2px solid #00f0ff; border-right: 2px solid #00f0ff;
+    z-index: 20; pointer-events: none;
+}
