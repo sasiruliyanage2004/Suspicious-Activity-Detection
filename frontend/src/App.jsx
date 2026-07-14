@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, Tooltip, ResponsiveContainer, YAxis, XAxis, CartesianGrid } from 'recharts';
-import { LayoutDashboard, Radio, Bell, PlaySquare, BarChart2, HardDrive, Settings, Search, Shield, AlertTriangle, User } from 'lucide-react';
+import { LayoutDashboard, Radio, Bell, PlaySquare, BarChart2, HardDrive, Settings, Search, Shield, AlertTriangle, User, Lock, Key, LogOut } from 'lucide-react';
 
-function App() {
+function Dashboard({ token, onLogout }) {
   const [alerts, setAlerts] = useState([]);
   const [cameras, setCameras] = useState([{ id: 'Cam-01', streamUrl: 'http://127.0.0.1:8002/video_feed', name: '01-Main' }]);
   const [timeStr, setTimeStr] = useState('');
@@ -202,6 +202,9 @@ function App() {
                 <User size={14} className="text-[var(--color-cyan)]"/>
                 <span className="text-sm opacity-80">User: Admin</span>
               </div>
+              <button onClick={onLogout} className="cyber-button w-8 h-8 ml-2 rounded-full flex items-center justify-center text-gray-400 hover:text-[var(--color-red)] hover:border-[var(--color-red)] border-gray-600">
+                 <LogOut size={14}/>
+              </button>
             </div>
           </div>
         </div>
@@ -463,4 +466,118 @@ function App() {
   );
 }
 
-export default App;
+function AuthScreen({ onLogin }) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+    try {
+      const res = await fetch(`http://127.0.0.1:8000${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setError(data.detail || 'Authentication failed');
+        return;
+      }
+      
+      if (isLogin) {
+        onLogin(data.access_token);
+      } else {
+        setIsLogin(true);
+        setError('Registration successful. Please login.');
+      }
+    } catch (err) {
+      setError('Network error. Backend might be offline.');
+    }
+  };
+
+  return (
+    <div className="flex h-screen w-full items-center justify-center bg-[var(--color-bg-dark)] relative overflow-hidden font-sans">
+      <div className="scan-line absolute inset-0 opacity-20"></div>
+      
+      <div className="glass-panel w-96 p-8 relative z-10 border-[var(--color-cyan)]/40 shadow-[0_0_50px_rgba(0,240,255,0.1)]">
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-16 h-16 rounded-full bg-[var(--color-cyan)]/10 border-2 border-[var(--color-cyan)] flex justify-center items-center mb-4 shadow-[0_0_20px_rgba(0,240,255,0.3)]">
+            <Shield className="text-[var(--color-cyan)] w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold tracking-widest text-white uppercase">{isLogin ? 'System Access' : 'Create Credentials'}</h1>
+          <h2 className="text-[10px] text-[var(--color-cyan)] opacity-70 tracking-widest uppercase mt-1">AI Security Core</h2>
+        </div>
+
+        {error && (
+          <div className={`mb-4 p-3 rounded border text-xs text-center font-bold tracking-widest ${error.includes('successful') ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-[#ff003c20] border-[var(--color-red)] text-[var(--color-red)]'}`}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-cyan)]/50 w-4 h-4" />
+            <input 
+              type="text" 
+              placeholder="OPERATIVE ID (USERNAME)" 
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              className="w-full bg-[#000] border border-[var(--color-cyan)]/30 rounded px-10 py-3 text-sm text-white focus:outline-none focus:border-[var(--color-cyan)] focus:shadow-[0_0_15px_rgba(0,240,255,0.2)] transition-all placeholder-gray-600 font-mono"
+              required
+            />
+          </div>
+          
+          <div className="relative">
+            <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-cyan)]/50 w-4 h-4" />
+            <input 
+              type="password" 
+              placeholder="SECURITY CIPHER (PASSWORD)" 
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full bg-[#000] border border-[var(--color-cyan)]/30 rounded px-10 py-3 text-sm text-white focus:outline-none focus:border-[var(--color-cyan)] focus:shadow-[0_0_15px_rgba(0,240,255,0.2)] transition-all placeholder-gray-600 font-mono"
+              required
+            />
+          </div>
+
+          <button type="submit" className="cyber-button w-full py-3 rounded text-sm font-bold tracking-widest uppercase mt-2 bg-[var(--color-cyan)]/10 hover:bg-[var(--color-cyan)]/20">
+            {isLogin ? 'Authenticate' : 'Initialize Account'}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button 
+            onClick={() => { setIsLogin(!isLogin); setError(''); }}
+            className="text-[10px] text-[var(--color-cyan)] opacity-70 hover:opacity-100 uppercase tracking-widest transition-opacity"
+          >
+            {isLogin ? 'Request New Access Credentials?' : 'Return to Authentication Portal'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [token, setToken] = useState(localStorage.getItem('auth_token'));
+
+  const handleLogin = (newToken) => {
+    localStorage.setItem('auth_token', newToken);
+    setToken(newToken);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    setToken(null);
+  };
+
+  if (!token) {
+    return <AuthScreen onLogin={handleLogin} />;
+  }
+
+  return <Dashboard token={token} onLogout={handleLogout} />;
+}
