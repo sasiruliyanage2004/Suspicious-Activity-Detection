@@ -467,6 +467,7 @@ function Dashboard({ token, onLogout }) {
 }
 
 function AuthScreen({ onLogin }) {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -483,45 +484,55 @@ function AuthScreen({ onLogin }) {
   };
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-[var(--color-bg-dark)] relative overflow-hidden font-sans">
-      <div className="scan-line absolute inset-0 opacity-20"></div>
+    <div className="flex h-screen w-full items-center justify-center bg-[#0a0f18] relative overflow-hidden font-sans">
       
-      <div className="glass-panel w-96 p-8 relative z-10 border-[var(--color-cyan)]/40 shadow-[0_0_50px_rgba(0,240,255,0.1)]">
+      <div className="bg-[#0f1523] rounded-lg w-96 p-8 relative z-10 border border-[#1a2639] shadow-2xl">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-full bg-[var(--color-cyan)]/10 border-2 border-[var(--color-cyan)] flex justify-center items-center mb-4 shadow-[0_0_20px_rgba(0,240,255,0.3)]">
+          <div className="w-16 h-16 rounded-full border border-[var(--color-cyan)] flex justify-center items-center mb-4">
             <Shield className="text-[var(--color-cyan)] w-8 h-8" />
           </div>
-          <h1 className="text-xl font-bold tracking-widest text-white uppercase">System Access</h1>
-          <h2 className="text-[10px] text-[var(--color-cyan)] opacity-70 tracking-widest uppercase mt-1">AI Security Core</h2>
+          <h1 className="text-[17px] font-bold tracking-widest text-white uppercase mt-2">Create Credentials</h1>
+          <h2 className="text-[10px] text-[var(--color-cyan)] tracking-widest uppercase mt-2">AI Security Core</h2>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded border text-xs text-center font-bold tracking-widest bg-[#ff003c20] border-[var(--color-red)] text-[var(--color-red)]">
+          <div className="mb-6 p-3 rounded border text-xs text-center font-bold tracking-widest bg-[#ff003c20] border-[var(--color-red)] text-[var(--color-red)]">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="relative">
-            <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-cyan)]/50 w-4 h-4" />
+            <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
+            <input 
+              type="text" 
+              placeholder="OPERATIVE ID (USERNAME)" 
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              className="w-full bg-[#05080f] border border-[#1a2639] rounded px-11 py-3.5 text-xs text-white focus:outline-none focus:border-[var(--color-cyan)] transition-colors placeholder-gray-600 font-mono tracking-wider"
+            />
+          </div>
+          
+          <div className="relative">
+            <Key className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
             <input 
               type="password" 
               placeholder="SECURITY CIPHER (PASSWORD)" 
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full bg-[#000] border border-[var(--color-cyan)]/30 rounded px-10 py-3 text-sm text-white focus:outline-none focus:border-[var(--color-cyan)] focus:shadow-[0_0_15px_rgba(0,240,255,0.2)] transition-all placeholder-gray-600 font-mono"
+              className="w-full bg-[#05080f] border border-[#1a2639] rounded px-11 py-3.5 text-xs text-white focus:outline-none focus:border-[var(--color-cyan)] transition-colors placeholder-gray-600 font-mono tracking-wider"
               required
             />
           </div>
 
-          <button type="submit" className="cyber-button w-full py-3 rounded text-sm font-bold tracking-widest uppercase mt-2 bg-[var(--color-cyan)]/10 hover:bg-[var(--color-cyan)]/20">
-            Authenticate
+          <button type="submit" className="w-full py-3.5 rounded text-xs font-bold tracking-widest uppercase mt-4 bg-transparent border border-[#1a2639] text-white hover:border-[var(--color-cyan)] hover:text-[var(--color-cyan)] transition-colors">
+            Initialize Account
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <span className="text-[10px] text-[var(--color-cyan)] opacity-40 uppercase tracking-widest">
-            Exhibition Mode Active
+        <div className="mt-8 text-center">
+          <span className="text-[9px] text-[var(--color-cyan)] opacity-70 uppercase tracking-widest cursor-pointer hover:opacity-100 transition-opacity">
+            Return to Authentication Portal
           </span>
         </div>
       </div>
