@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { LineChart, Line, Tooltip, ResponsiveContainer } from 'recharts';
 
 function App() {
   const [alerts, setAlerts] = useState([]);
   const [timeStr, setTimeStr] = useState('');
   const [videoKey, setVideoKey] = useState(Date.now());
   const [sensitivity, setSensitivity] = useState(65);
+
+  const chartData = [
+    { time: '08:00', threats: 2 },
+    { time: '10:00', threats: 5 },
+    { time: '12:00', threats: 1 },
+    { time: '14:00', threats: 8 },
+    { time: '16:00', threats: Math.max(3, alerts.length) },
+  ];
 
   const handleSensitivityChange = async (e) => {
     const val = parseInt(e.target.value);
@@ -233,49 +242,72 @@ function App() {
                   </div>
                 </div>
               </div>
-              <div className="relative aspect-video rounded-2xl border-2 border-primary/40 camera-glow overflow-hidden tech-grid group bg-black flex justify-center items-center">
-                <div className="absolute inset-0 z-0">
-                  <img 
-                    key={videoKey}
-                    className="w-full h-full object-cover brightness-75 group-hover:brightness-90 transition-all duration-700 opacity-90" 
-                    alt="Camera feed is starting up... Please wait." 
-                    src={`http://127.0.0.1:8002/video_feed?t=${videoKey}`}
-                    onError={handleVideoError}
-                  />
-                </div>
-                <div className="absolute inset-0 pointer-events-none p-6 flex flex-col justify-between z-10">
-                  <div className="flex justify-between items-start">
-                    <div className="bg-black/40 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                      <div className="w-2 h-2 bg-error rounded-full animate-pulse-red"></div>
-                      <span className="text-error font-bold text-sm tracking-tighter">REC</span>
-                    </div>
-                    <div className="text-right font-mono text-primary/80 text-xs space-y-1">
-                      <p>{timeStr || "Loading time..."}</p>
-                      <p>LAT: 40.7128° N | LON: 74.0060° W</p>
-                    </div>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Camera 01 - Live Feed */}
+                <div className={`relative aspect-video rounded-2xl border-2 overflow-hidden tech-grid group bg-black flex justify-center items-center ${alerts.length > 0 && ['weapon', 'gun', 'knife', 'grenade', 'explosion', 'fall', 'fight'].some(w => (alerts[0].behavior_type || '').toLowerCase().includes(w)) && (new Date() - new Date(alerts[0].timestamp)) < 8000 ? 'border-error camera-glow-error' : 'border-primary/40 camera-glow'}`}>
+                  <div className="absolute inset-0 z-0">
+                    <img 
+                      key={videoKey}
+                      className="w-full h-full object-cover brightness-75 group-hover:brightness-90 transition-all duration-700 opacity-90" 
+                      alt="Camera feed is starting up... Please wait." 
+                      src={`http://127.0.0.1:8002/video_feed?t=${videoKey}`}
+                      onError={handleVideoError}
+                    />
                   </div>
-                  <div className="flex justify-between items-end">
-                    <div className="bg-black/40 backdrop-blur-md border border-primary/20 p-4 rounded-xl">
-                      <div className="font-mono text-primary/90 text-sm space-y-1">
-                        <p><span className="opacity-50">Camera ID:</span> Cam-01</p>
-                        <p><span className="opacity-50">Status:</span> Online (Tracking Active)</p>
+                  <div className="absolute inset-0 pointer-events-none p-4 flex flex-col justify-between z-10">
+                    <div className="flex justify-between items-start">
+                      <div className="bg-black/40 backdrop-blur-md border border-white/10 px-2 py-1 rounded flex items-center gap-2">
+                        <div className="w-2 h-2 bg-error rounded-full animate-pulse-red"></div>
+                        <span className="text-error font-bold text-[10px] tracking-tighter">REC</span>
                       </div>
                     </div>
-                    <div className="flex gap-4">
-                      <div className="w-12 h-12 glass-card rounded-full flex items-center justify-center border-primary/30">
-                        <span className="material-symbols-outlined text-primary/60">videocam</span>
-                      </div>
-                      <div className="w-12 h-12 glass-card rounded-full flex items-center justify-center border-primary/30">
-                        <span className="material-symbols-outlined text-primary/60">mic</span>
+                    <div className="flex justify-between items-end">
+                      <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-primary/20">
+                        <p className="font-mono text-primary/90 text-xs"><span className="opacity-50">Cam:</span> 01-Main</p>
                       </div>
                     </div>
                   </div>
+                  <div className="absolute inset-x-0 h-[1px] bg-primary/20 shadow-[0_0_15px_rgba(125,211,252,0.5)] top-0 animate-[scan_8s_linear_infinite] z-20"></div>
                 </div>
-                <div className="absolute inset-x-0 h-[1px] bg-primary/20 shadow-[0_0_15px_rgba(125,211,252,0.5)] top-0 animate-[scan_8s_linear_infinite] z-20"></div>
+
+                {/* Camera 02 - Standby */}
+                <div className="relative aspect-video rounded-2xl border-2 border-surface-variant/30 overflow-hidden bg-black flex justify-center items-center group">
+                  <span className="text-on-surface-variant/40 font-mono text-sm group-hover:text-primary/50 transition-colors animate-pulse">Cam-02 : STANDBY</span>
+                  <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-surface-variant/30">
+                    <p className="font-mono text-on-surface-variant/60 text-xs">02-Lobby</p>
+                  </div>
+                </div>
+
+                {/* Camera 03 - Standby */}
+                <div className="relative aspect-video rounded-2xl border-2 border-surface-variant/30 overflow-hidden bg-black flex justify-center items-center group">
+                  <span className="text-on-surface-variant/40 font-mono text-sm group-hover:text-primary/50 transition-colors animate-pulse">Cam-03 : STANDBY</span>
+                  <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-surface-variant/30">
+                    <p className="font-mono text-on-surface-variant/60 text-xs">03-Backdoor</p>
+                  </div>
+                </div>
+
+                {/* Camera 04 - Standby */}
+                <div className="relative aspect-video rounded-2xl border-2 border-surface-variant/30 overflow-hidden bg-black flex justify-center items-center group">
+                  <span className="text-on-surface-variant/40 font-mono text-sm group-hover:text-primary/50 transition-colors animate-pulse">Cam-04 : STANDBY</span>
+                  <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-surface-variant/30">
+                    <p className="font-mono text-on-surface-variant/60 text-xs">04-Parking</p>
+                  </div>
+                </div>
               </div>
             </div>
             
             <div className="flex flex-col h-[70vh] gap-4">
+              <div className="glass-card p-4 rounded-xl border-primary/20 h-40 shrink-0">
+                <h2 className="text-sm font-headline font-bold text-on-surface mb-2">Live Threat Analytics</h2>
+                <div className="h-24 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <Line type="monotone" dataKey="threats" stroke="#7dd3fc" strokeWidth={2} dot={{ r: 3, fill: '#7dd3fc' }} />
+                      <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 21, 36, 0.9)', border: '1px solid rgba(125, 211, 252, 0.2)', borderRadius: '8px', color: '#7dd3fc' }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
               <div className="glass-card p-4 rounded-xl flex items-center justify-between border-primary/20">
                 <h2 className="text-xl font-headline font-bold text-on-surface">Recent Security Alerts</h2>
                 <span className="material-symbols-outlined text-primary/50">filter_list</span>
