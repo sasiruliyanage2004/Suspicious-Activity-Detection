@@ -467,36 +467,18 @@ function Dashboard({ token, onLogout }) {
 }
 
 function AuthScreen({ onLogin }) {
-  const [isLogin, setIsLogin] = useState(true);
-  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-    try {
-      const res = await fetch(`http://127.0.0.1:8000${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await res.json();
-      
-      if (!res.ok) {
-        setError(data.detail || 'Authentication failed');
-        return;
-      }
-      
-      if (isLogin) {
-        onLogin(data.access_token);
-      } else {
-        setIsLogin(true);
-        setError('Registration successful. Please login.');
-      }
-    } catch (err) {
-      setError('Network error. Backend might be offline.');
+    
+    // Simplified Hardcoded Authentication for Exhibition
+    if (password === 'admin123') {
+      onLogin('exhibition_admin_token');
+    } else {
+      setError('Access Denied. Incorrect Security Cipher.');
     }
   };
 
@@ -509,29 +491,17 @@ function AuthScreen({ onLogin }) {
           <div className="w-16 h-16 rounded-full bg-[var(--color-cyan)]/10 border-2 border-[var(--color-cyan)] flex justify-center items-center mb-4 shadow-[0_0_20px_rgba(0,240,255,0.3)]">
             <Shield className="text-[var(--color-cyan)] w-8 h-8" />
           </div>
-          <h1 className="text-xl font-bold tracking-widest text-white uppercase">{isLogin ? 'System Access' : 'Create Credentials'}</h1>
+          <h1 className="text-xl font-bold tracking-widest text-white uppercase">System Access</h1>
           <h2 className="text-[10px] text-[var(--color-cyan)] opacity-70 tracking-widest uppercase mt-1">AI Security Core</h2>
         </div>
 
         {error && (
-          <div className={`mb-4 p-3 rounded border text-xs text-center font-bold tracking-widest ${error.includes('successful') ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-[#ff003c20] border-[var(--color-red)] text-[var(--color-red)]'}`}>
+          <div className="mb-4 p-3 rounded border text-xs text-center font-bold tracking-widest bg-[#ff003c20] border-[var(--color-red)] text-[var(--color-red)]">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <div className="relative">
-            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-cyan)]/50 w-4 h-4" />
-            <input 
-              type="text" 
-              placeholder="OPERATIVE ID (USERNAME)" 
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              className="w-full bg-[#000] border border-[var(--color-cyan)]/30 rounded px-10 py-3 text-sm text-white focus:outline-none focus:border-[var(--color-cyan)] focus:shadow-[0_0_15px_rgba(0,240,255,0.2)] transition-all placeholder-gray-600 font-mono"
-              required
-            />
-          </div>
-          
           <div className="relative">
             <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-cyan)]/50 w-4 h-4" />
             <input 
@@ -545,17 +515,14 @@ function AuthScreen({ onLogin }) {
           </div>
 
           <button type="submit" className="cyber-button w-full py-3 rounded text-sm font-bold tracking-widest uppercase mt-2 bg-[var(--color-cyan)]/10 hover:bg-[var(--color-cyan)]/20">
-            {isLogin ? 'Authenticate' : 'Initialize Account'}
+            Authenticate
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <button 
-            onClick={() => { setIsLogin(!isLogin); setError(''); }}
-            className="text-[10px] text-[var(--color-cyan)] opacity-70 hover:opacity-100 uppercase tracking-widest transition-opacity"
-          >
-            {isLogin ? 'Request New Access Credentials?' : 'Return to Authentication Portal'}
-          </button>
+          <span className="text-[10px] text-[var(--color-cyan)] opacity-40 uppercase tracking-widest">
+            Exhibition Mode Active
+          </span>
         </div>
       </div>
     </div>
