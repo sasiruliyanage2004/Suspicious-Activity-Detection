@@ -9,6 +9,35 @@ function Dashboard({ token, onLogout }) {
   const [sensitivity, setSensitivity] = useState(65);
   const [currentView, setCurrentView] = useState('Live Feeds');
   const [selectedCamera, setSelectedCamera] = useState(null);
+  const [systemHealth, setSystemHealth] = useState({ cpu_percent: 0, memory_percent: 0 });
+
+  const playVoiceAlert = (messageText) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(messageText);
+      utterance.rate = 1.1;
+      utterance.pitch = 0.9;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const exportToCSV = () => {
+    if (alerts.length === 0) return;
+    const headers = ['Time', 'Camera Node', 'Threat Type', 'Confidence'];
+    const rows = alerts.map(a => [
+      new Date(a.timestamp || Date.now()).toLocaleString(),
+      a.camera_id,
+      a.behavior_type,
+      `${(a.confidence * 100).toFixed(1)}%`
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `aegis_evidence_${new Date().getTime()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Chart Data
   const threatData = [
@@ -63,6 +92,11 @@ function Dashboard({ token, onLogout }) {
         }
         if (message && message.behavior_type && message.behavior_type !== 'Unknown') {
           setAlerts(prev => [message, ...prev].slice(0, 50));
+          
+          const isHighThreat = ['weapon', 'gun', 'knife', 'grenade', 'suspicious activity', 'falling'].some(w => message.behavior_type.toLowerCase().includes(w));
+          if (isHighThreat) {
+            playVoiceAlert(`Warning. ${message.behavior_type} detected on ${message.camera_id}.`);
+          }
         }
       } catch (e) {}
     };
@@ -74,7 +108,21 @@ function Dashboard({ token, onLogout }) {
       const now = new Date();
       setTimeStr(now.toLocaleTimeString('en-GB', { hour12: false }) + ' GMT');
     }, 1000);
-    return () => clearInterval(clockInterval);
+
+    const healthInterval = setInterval(async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/system/health');
+        if (res.ok) {
+          const data = await res.json();
+          setSystemHealth(data);
+        }
+      } catch (err) {}
+    }, 3000);
+
+    return () => {
+       clearInterval(clockInterval);
+       clearInterval(healthInterval);
+    };
   }, []);
 
   const navItems = [
@@ -147,10 +195,10 @@ function Dashboard({ token, onLogout }) {
             <div className="p-4 rounded bg-surface-container-lowest border border-white/5">
               <div className="flex justify-between items-center mb-2">
                 <span className="font-label-caps text-[10px] text-on-surface-variant">OPS_UNIT_01</span>
-                <span className="font-data-mono text-[10px] text-primary">LOAD: 24%</span>
+                <span className="font-data-mono text-[10px] text-primary">LOAD: {systemHealth.cpu_percent.toFixed(0)}%</span>
               </div>
               <div className="w-full bg-surface-variant h-1 rounded-full overflow-hidden">
-                <div className="bg-primary h-full w-[24%]"></div>
+                <div className="bg-primary h-full transition-all duration-1000" style={{ width: `${systemHealth.cpu_percent}%` }}></div>
               </div>
             </div>
           </div>
@@ -216,9 +264,14 @@ function Dashboard({ token, onLogout }) {
 
           {currentView === 'Alerts' && (
             <div className="h-full bg-surface-container-lowest border border-white/10 rounded-lg p-6 overflow-y-auto custom-scrollbar">
-              <h2 className="font-headline-md text-primary mb-6 flex items-center gap-2 glow-cyan">
-                 <span className="material-symbols-outlined">notification_important</span> Alert Database
-              </h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="font-headline-md text-primary glow-cyan flex items-center gap-2">
+                   <span className="material-symbols-outlined">notification_important</span> Alert Database
+                </h2>
+                <button onClick={exportToCSV} className="bg-primary/20 hover:bg-primary/40 text-primary border border-primary/50 font-label-caps text-[10px] px-3 py-1.5 rounded-sm transition-colors flex items-center gap-2 uppercase tracking-widest">
+                  <span className="material-symbols-outlined text-[14px]">download</span> Export Evidence
+                </button>
+              </div>
               <table className="w-full text-left font-data-mono text-sm">
                 <thead className="bg-primary/10 text-primary">
                   <tr>
@@ -260,7 +313,7 @@ function Dashboard({ token, onLogout }) {
                    </div>
                    <div className="bg-surface-container-low border border-primary/20 p-6 rounded-lg hud-bracket">
                       <div className="text-on-surface-variant font-label-caps text-xs tracking-widest uppercase mb-2">System Load</div>
-                      <div className="text-4xl font-data-mono text-primary glow-cyan">24%</div>
+                      <div className="text-4xl font-data-mono text-primary glow-cyan">{systemHealth.cpu_percent.toFixed(0)}%</div>
                    </div>
                 </div>
              </div>

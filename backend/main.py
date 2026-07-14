@@ -9,6 +9,7 @@ import jwt
 from datetime import datetime, timedelta
 from models import User
 from pydantic import BaseModel
+import psutil
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = "scifi_cyber_secret_key"
@@ -45,6 +46,14 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/")
 def root():
     return {"message": "Welcome to Suspicious Behavior Detection MVP API"}
+
+@app.get("/api/system/health")
+def system_health():
+    cpu = psutil.cpu_percent(interval=0.1)
+    memory = psutil.virtual_memory().percent
+    # We take the higher of the two to represent 'System Load' broadly, 
+    # or just return both.
+    return {"cpu_percent": cpu, "memory_percent": memory}
 
 # --- Authentication APIs ---
 
