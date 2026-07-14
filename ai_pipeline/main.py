@@ -187,6 +187,26 @@ def generate_frames():
                                 # Draw warning on frame continuously
                                 cv2.putText(annotated_frame, f"ALERT: {alert['behavior']}", (10, 50), 
                                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                                            
+                    # Group Behavior Analysis (e.g. Fighting)
+                    person_tracks = []
+                    person_boxes = []
+                    for box, track_id, class_id in zip(boxes, track_ids, class_ids):
+                        if class_id == 0:
+                            person_tracks.append(track_id)
+                            person_boxes.append(box)
+                            
+                    group_alert = analyzer.analyze_group_behavior(person_tracks, person_boxes)
+                    if group_alert:
+                        if group_alert.get("is_new"):
+                            api.send_alert(
+                                camera_id="webcam_1",
+                                behavior_type=group_alert["behavior"],
+                                confidence=group_alert["confidence"],
+                                details=group_alert["details"]
+                            )
+                        cv2.putText(annotated_frame, f"CRITICAL: {group_alert['behavior']}", (10, 170), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
                 
                 # Render weapon detection results on top
                 if weapon_results and len(weapon_results) > 0 and weapon_results[0].boxes is not None and len(weapon_results[0].boxes) > 0:

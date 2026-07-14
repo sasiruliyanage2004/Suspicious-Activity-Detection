@@ -15,6 +15,10 @@ class BehaviorAnalyzer:
         # Emotion state
         self.emotion_alerted = False
         self.last_emotion_alert_time = 0
+        
+        # Violence state
+        self.violence_alerted = False
+        self.last_violence_time = 0
     
     def analyze(self, track_id, bbox, keypoints=None, conf=0.9):
         # Extract center of bounding box
@@ -38,6 +42,17 @@ class BehaviorAnalyzer:
             }
         
         history = self.track_history[track_id]
+        
+        # Calculate instantaneous velocity for fighting detection
+        if "prev_pos" in history:
+            px, py = history["prev_pos"]
+            pt = history["prev_time"]
+            dt = current_time - pt
+            if dt > 0:
+                history["velocity"] = ((cx - px)**2 + (cy - py)**2)**0.5 / dt
+        
+        history["prev_pos"] = (cx, cy)
+        history["prev_time"] = current_time
         
         # 1. Fall Detection (using Pose Keypoints)
         if keypoints is not None and len(keypoints) >= 13:
@@ -144,3 +159,50 @@ class BehaviorAnalyzer:
             if current_time - self.last_emotion_alert_time > 5.0:
                 self.emotion_alerted = False
             return None
+
+    def analyze_group_behavior(self, current_tracks, boxes):
+        current_time = time.time()
+        n = len(current_tracks)
+        
+        # We need at least 2 people to fight
+        if n < 2:
+            if current_time - self.last_violence_time > 5.0:
+                self.violence_alerted = False
+            return None
+            
+        for i in range(n):
+            for j in range(i+1, n):
+                id1 = current_tracks[i]
+                id2 = current_tracks[j]
+                
+                box1 = boxes[i]
+                box2 = boxes[j]
+                
+                # Calculate distance between centers
+                cx1, cy1 = (box1[0]+box1[2])/2, (box1[1]+box1[3])/2
+                cx2, cy2 = (box2[0]+box2[2])/2, (box2[1]+box2[3])/2
+                
+                dist = ((cx1-cx2)**2 + (cy1-cy2)**2)**0.5
+                
+                # If they are very close (e.g. < 200 pixels)
+                if dist < 200:
+                    v1 = self.track_history.get(id1, {}).get("velocity", 0)
+                    v2 = self.track_history.get(id2, {}).get("velocity", 0)
+                    
+                    # If both are moving rapidly (e.g. > 250 pixels/sec)
+                    if v1 > 250 and v2 > 250:
+                        is_new = not self.violence_alerted
+                        self.violence_alerted = True
+                        self.last_violence_time = current_time
+                        return {
+                            "behavior": "Violence Detected",
+                            "confidence": 0.85,
+                            "details": f"Physical altercation detected between IDs {id1} and {id2}",
+                            "is_new": is_new
+                        }
+        
+        # Reset alert if no fighting detected recently
+        if current_time - self.last_violence_time > 5.0:
+            self.violence_alerted = False
+            
+        return None
