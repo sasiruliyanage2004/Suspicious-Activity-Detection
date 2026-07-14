@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, BarChart, Bar, Tooltip, ResponsiveContainer, XAxis } from 'recharts';
 
 function Dashboard({ token, onLogout }) {
@@ -10,8 +10,15 @@ function Dashboard({ token, onLogout }) {
   const [currentView, setCurrentView] = useState('Live Feeds');
   const [selectedCamera, setSelectedCamera] = useState(null);
   const [systemHealth, setSystemHealth] = useState({ cpu_percent: 0, memory_percent: 0 });
+  const [isMuted, setIsMuted] = useState(false);
+  const isMutedRef = useRef(isMuted);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
 
   const playVoiceAlert = (messageText) => {
+    if (isMutedRef.current) return;
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(messageText);
       utterance.rate = 1.1;
@@ -154,8 +161,14 @@ function Dashboard({ token, onLogout }) {
             <span className="font-data-mono text-data-mono text-primary tracking-tighter">{timeStr}</span>
             <span className="font-label-caps text-[9px] text-on-surface-variant tracking-widest">REALTIME_SYNC_ENABLED</span>
           </div>
-          <div className="flex gap-4 border-l border-white/10 pl-6">
-            <span className="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer transition-all">notifications_active</span>
+          <div className="flex gap-4 border-l border-white/10 pl-6 items-center">
+            <span 
+              onClick={() => setIsMuted(!isMuted)} 
+              className={`material-symbols-outlined cursor-pointer transition-all ${isMuted ? 'text-secondary hover:text-secondary/80' : 'text-on-surface-variant hover:text-primary'}`}
+              title={isMuted ? "Unmute Voice Alerts" : "Mute Voice Alerts"}
+            >
+              {isMuted ? 'notifications_off' : 'notifications_active'}
+            </span>
             <span className="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer transition-all">admin_panel_settings</span>
           </div>
           <div className="flex items-center gap-3 bg-white/5 px-3 py-1.5 rounded border border-white/5">
