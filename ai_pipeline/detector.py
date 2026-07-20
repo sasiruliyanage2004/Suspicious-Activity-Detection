@@ -1,7 +1,7 @@
 from ultralytics import YOLO
 
 class Detector:
-    def __init__(self, pose_model='yolov8n-pose.pt', weapon_model='best.pt'):
+    def __init__(self, pose_model='yolo11n-pose.pt', weapon_model='best.pt'):
         # Initialize YOLOv8 Pose model
         self.pose_model = YOLO(pose_model)
         # Initialize Weapon detection model
