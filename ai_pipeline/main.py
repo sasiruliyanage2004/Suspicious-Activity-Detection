@@ -12,14 +12,20 @@ import numpy as np
 
 import threading
 import requests
+from ptz_controller import PTZController
 app = FastAPI()
 
 def auto_register_camera():
     while True:
         try:
             requests.post("http://127.0.0.1:8000/api/cameras/register", json={
-                "camera_id": "Cam-01",
-                "ip_address": "127.0.0.1",
+                "camera_id": "PTZ-Cam-1",
+                "stream_url": "/api/video_feed/1",
+                "port": 8002
+            })
+            requests.post("http://127.0.0.1:8000/api/cameras/register", json={
+                "camera_id": "Fixed-Cam-2",
+                "stream_url": "/api/video_feed/2",
                 "port": 8002
             })
             print("Successfully auto-registered Camera 01 to Backend")
@@ -56,52 +62,19 @@ api = APIClient()
 # Initialize Emotion Detector (mtcnn=True uses MTCNN which is much more accurate for face detection)
 emotion_detector = FER(mtcnn=True)
 
-def generate_frames():
-    # Attempt to open webcam using different indices and backend configurations
-    cap = None
-    cameras_to_try = [
-        (0, cv2.CAP_DSHOW),
-        (0, None),
-        (1, cv2.CAP_DSHOW),
-        (1, None),
-        (2, None)
-    ]
-    
-    for idx, backend in cameras_to_try:
-        print(f"Attempting to open camera index {idx} with backend {backend}...")
-        try:
-            if backend is not None:
-                cap = cv2.VideoCapture(idx, backend)
-            else:
-                cap = cv2.VideoCapture(idx)
-                
-            if cap is not None and cap.isOpened():
-                ret, frame = cap.read()
-                if ret:
-                    print(f"Successfully initialized camera index {idx}!")
-                    break
-                else:
-                    cap.release()
-                    cap = None
-            else:
-                if cap is not None:
-                    cap.release()
-                cap = None
-        except Exception as e:
-            print(f"Failed to initialize camera index {idx}: {e}")
-            if cap is not None:
-                cap.release()
-            cap = None
+# Initialize PTZ Controllers
+ptz_cam1 = PTZController("192.168.1.64", 80, "admin", "admin123")
+ptz_cam2 = None # Camera 2 is fixed or we don't have credentials for it yet
 
-    if cap is not None and cap.isOpened():
-        # Set resolution to 720p for clearer video
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+def generate_frames(camera_url, camera_id, ptz_controller=None):
+    cap = cv2.VideoCapture(camera_url)
+    
+    if cap.isOpened():
+        print(f"Successfully initialized camera {camera_id} at {camera_url}")
         use_simulation = False
-        print("Started Suspicious Behavior Detection MVP Pipeline with live camera")
     else:
+        print(f"Failed to open {camera_url}. Falling back to simulation for {camera_id}...")
         use_simulation = True
-        print("No webcam available. Falling back to Simulated Security Feed...")
 
     frame_counter = 0
     last_emotions = []
@@ -139,7 +112,7 @@ def generate_frames():
                 if weapon_alert:
                     if weapon_alert.get("is_new"):
                         api.send_alert(
-                            camera_id="webcam_1",
+                            camera_id=camera_id,
                             behavior_type=weapon_alert["behavior"],
                             confidence=weapon_alert["confidence"],
                             details=weapon_alert["details"]
@@ -178,7 +151,7 @@ def generate_frames():
                             if alert:
                                 if alert.get("is_new"):
                                     api.send_alert(
-                                        camera_id="webcam_1",
+                                        camera_id=camera_id,
                                         behavior_type=alert["behavior"],
                                         confidence=alert["confidence"],
                                         details=alert["details"]
@@ -187,6 +160,17 @@ def generate_frames():
                                 # Draw warning on frame continuously
                                 cv2.putText(annotated_frame, f"ALERT: {alert['behavior']}", (10, 50), 
                                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                                            
+                            # PTZ Tracking: Command camera to move towards the center of this person's bounding box
+                            if ptz_controller is not None:
+                                cx = (x1 + x2) / 2
+                                cy = (y1 + y2) / 2
+                                # Assuming 720p or getting exact frame dims
+                                h, w = frame.shape[:2]
+                                ptz_controller.track_target(cx, cy, w, h)
+                                
+                                # Draw target crosshair
+                                cv2.drawMarker(annotated_frame, (int(cx), int(cy)), (0, 255, 255), cv2.MARKER_CROSS, 20, 2)
                                             
                     # Group Behavior Analysis (e.g. Fighting)
                     person_tracks = []
@@ -200,7 +184,7 @@ def generate_frames():
                     if group_alert:
                         if group_alert.get("is_new"):
                             api.send_alert(
-                                camera_id="webcam_1",
+                                camera_id=camera_id,
                                 behavior_type=group_alert["behavior"],
                                 confidence=group_alert["confidence"],
                                 details=group_alert["details"]
@@ -237,7 +221,7 @@ def generate_frames():
                             if emotion_alert:
                                 if emotion_alert.get("is_new"):
                                     api.send_alert(
-                                        camera_id="webcam_1",
+                                        camera_id=camera_id,
                                         behavior_type=emotion_alert["behavior"],
                                         confidence=emotion_alert["confidence"],
                                         details=emotion_alert["details"]
@@ -472,6 +456,12 @@ def generate_frames():
             cap.release()
 
 
-@app.get("/video_feed")
-def video_feed():
-    return StreamingResponse(generate_frames(), media_type="multipart/x-mixed-replace; boundary=frame")
+@app.get("/api/video_feed/1")
+def video_feed_1():
+    url = "rtsp://admin:admin123@192.168.1.64:554/Streaming/Channels/101"
+    return StreamingResponse(generate_frames(url, "PTZ-Cam-1", ptz_cam1), media_type="multipart/x-mixed-replace; boundary=frame")
+
+@app.get("/api/video_feed/2")
+def video_feed_2():
+    url = "rtsp://admin:admin123@192.168.1.2:554/Streaming/Channels/101"
+    return StreamingResponse(generate_frames(url, "Fixed-Cam-2", ptz_cam2), media_type="multipart/x-mixed-replace; boundary=frame")
