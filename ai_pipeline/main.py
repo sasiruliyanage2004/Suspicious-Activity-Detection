@@ -94,11 +94,19 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
     reader_thread = threading.Thread(target=frame_reader_thread, daemon=True)
     reader_thread.start()
 
-    # Wait for first frame or fall back to simulation
-    time.sleep(2)
+    # Wait for first frame - give up to 10 seconds for camera to connect
+    # (AI pipeline startup is heavy, so cameras need more time)
+    print(f"[{camera_id}] Waiting for first frame (up to 10s)...")
+    for _ in range(100):  # 100 x 0.1s = 10 seconds max
+        if not raw_frame_queue.empty():
+            break
+        time.sleep(0.1)
+    
     use_simulation = raw_frame_queue.empty()
     if use_simulation:
-        print(f"[{camera_id}] No frames received, using simulation mode")
+        print(f"[{camera_id}] No frames received after 10s, using simulation mode")
+    else:
+        print(f"[{camera_id}] First frame received! Starting live stream.")
 
     frame_counter = 0
     last_emotions = []
