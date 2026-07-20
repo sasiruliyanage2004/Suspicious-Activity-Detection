@@ -3,7 +3,7 @@ import { LineChart, Line, BarChart, Bar, Tooltip, ResponsiveContainer, XAxis } f
 
 function Dashboard({ token, onLogout }) {
   const [alerts, setAlerts] = useState([]);
-  const [cameras, setCameras] = useState([{ id: 'Cam-01', streamUrl: 'http://127.0.0.1:8002/video_feed', name: '01-Main' }]);
+  const [cameras, setCameras] = useState([]);
   const [timeStr, setTimeStr] = useState('');
   const [videoKey, setVideoKey] = useState(Date.now());
   const [sensitivity, setSensitivity] = useState(65);

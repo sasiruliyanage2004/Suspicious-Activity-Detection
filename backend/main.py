@@ -95,17 +95,18 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
 
 from pydantic import BaseModel
 
+from typing import Optional
+
 class CameraRegister(BaseModel):
     camera_id: str
-    ip_address: str
-    port: int
+    stream_url: str
 
 @app.post("/api/cameras/register")
 async def register_camera(cam: CameraRegister):
     msg = {
         "type": "new_camera",
         "camera_id": cam.camera_id,
-        "stream_url": f"http://{cam.ip_address}:{cam.port}/video_feed"
+        "stream_url": cam.stream_url
     }
     await manager.broadcast(json.dumps(msg))
     return {"status": "success", "message": "Registered"}

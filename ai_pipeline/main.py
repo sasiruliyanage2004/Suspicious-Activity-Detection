@@ -20,13 +20,11 @@ def auto_register_camera():
         try:
             requests.post("http://127.0.0.1:8000/api/cameras/register", json={
                 "camera_id": "PTZ-Cam-1",
-                "stream_url": "/api/video_feed/1",
-                "port": 8002
+                "stream_url": "http://127.0.0.1:8002/api/video_feed/1"
             })
             requests.post("http://127.0.0.1:8000/api/cameras/register", json={
                 "camera_id": "Fixed-Cam-2",
-                "stream_url": "/api/video_feed/2",
-                "port": 8002
+                "stream_url": "http://127.0.0.1:8002/api/video_feed/2"
             })
             print("Successfully auto-registered Camera 01 to Backend")
             break
