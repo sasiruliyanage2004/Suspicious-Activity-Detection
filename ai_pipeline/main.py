@@ -164,8 +164,8 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                     with _detector_lock:
                         last_emotions = emotion_detector.detect_emotions(frame)
                 
-                # 1. Weapon detection already done above
-                weapon_alert = analyzer.analyze_weapons(weapon_results, threshold=GLOBAL_WEAPON_THRESHOLD)
+                # 2. Analyze Weapon Behavior
+                weapon_alert = cam_analyzer.analyze_weapons(weapon_results, threshold=GLOBAL_WEAPON_THRESHOLD)
                 if weapon_alert:
                     if weapon_alert.get("is_new"):
                         api.send_alert(
