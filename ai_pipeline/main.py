@@ -65,14 +65,40 @@ ptz_cam1 = PTZController("192.168.1.64", 80, "admin", "Hikvision321")
 ptz_cam2 = None # Camera 2 is fixed or we don't have credentials for it yet
 
 def generate_frames(camera_url, camera_id, ptz_controller=None):
-    cap = cv2.VideoCapture(camera_url)
+    import queue
+
+    # --- Threaded Frame Reader to prevent blocking ---
+    raw_frame_queue = queue.Queue(maxsize=2)
     
-    if cap.isOpened():
-        print(f"Successfully initialized camera {camera_id} at {camera_url}")
-        use_simulation = False
-    else:
-        print(f"Failed to open {camera_url}. Falling back to simulation for {camera_id}...")
-        use_simulation = True
+    def frame_reader_thread():
+        cap = cv2.VideoCapture(camera_url)
+        if cap.isOpened():
+            print(f"[{camera_id}] Frame reader connected to {camera_url}")
+        else:
+            print(f"[{camera_id}] Cannot connect to {camera_url}")
+        while True:
+            if cap.isOpened():
+                ret, frame = cap.read()
+                if ret:
+                    # Drop oldest if full, always keep latest
+                    if raw_frame_queue.full():
+                        try: raw_frame_queue.get_nowait()
+                        except: pass
+                    raw_frame_queue.put(frame)
+                else:
+                    time.sleep(0.1)
+            else:
+                time.sleep(1)
+                cap = cv2.VideoCapture(camera_url)
+
+    reader_thread = threading.Thread(target=frame_reader_thread, daemon=True)
+    reader_thread.start()
+
+    # Wait for first frame or fall back to simulation
+    time.sleep(2)
+    use_simulation = raw_frame_queue.empty()
+    if use_simulation:
+        print(f"[{camera_id}] No frames received, using simulation mode")
 
     frame_counter = 0
     last_emotions = []
@@ -88,9 +114,12 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
     try:
         while True:
             if not use_simulation:
-                ret, frame = cap.read()
-                if not ret:
-                    break
+                # Non-blocking get with timeout
+                try:
+                    frame = raw_frame_queue.get(timeout=1.0)
+                except queue.Empty:
+                    use_simulation = True
+                    continue
                     
                 # Flip the frame horizontally to fix mirror effect
                 frame = cv2.flip(frame, 1)
@@ -163,7 +192,6 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
                             if ptz_controller is not None:
                                 cx = (x1 + x2) / 2
                                 cy = (y1 + y2) / 2
-                                # Assuming 720p or getting exact frame dims
                                 h, w = frame.shape[:2]
                                 ptz_controller.track_target(cx, cy, w, h)
                                 
@@ -193,7 +221,6 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
                 # Render weapon detection results on top
                 if weapon_results and len(weapon_results) > 0 and weapon_results[0].boxes is not None and len(weapon_results[0].boxes) > 0:
                     for box in weapon_results[0].boxes:
-                        # Dynamic threshold
                         if box.conf.item() > GLOBAL_WEAPON_THRESHOLD:
                             x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                             cls_id = int(box.cls.item())
@@ -210,11 +237,9 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
                         x, y, w, h = box
                         
                         if emotions:
-                            # Find dominant emotion
                             dominant_emotion = max(emotions, key=emotions.get)
                             confidence = emotions[dominant_emotion]
                             
-                            # Analyze and trigger emotion alert
                             emotion_alert = analyzer.analyze_emotion(dominant_emotion, confidence)
                             if emotion_alert:
                                 if emotion_alert.get("is_new"):
@@ -227,10 +252,9 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
                                 cv2.putText(annotated_frame, f"CRITICAL: {emotion_alert['behavior']}", (10, 130), 
                                             cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 165, 255), 3)
 
-                            # Draw emotion box on face
-                            color = (0, 255, 0) # Green for normal
+                            color = (0, 255, 0)
                             if dominant_emotion in ['angry', 'fear', 'disgust'] and confidence > 0.6:
-                                color = (0, 165, 255) # Orange for suspicious
+                                color = (0, 165, 255)
                                 
                             display_emotion = "Natural" if dominant_emotion == "neutral" else dominant_emotion.capitalize()
                             cv2.rectangle(annotated_frame, (x, y), (x+w, y+h), color, 2)
