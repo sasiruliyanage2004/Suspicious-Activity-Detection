@@ -61,7 +61,7 @@ api = APIClient()
 emotion_detector = FER(mtcnn=True)
 
 # Initialize PTZ Controllers
-ptz_cam1 = PTZController("192.168.1.64", 80, "admin", "admin123")
+ptz_cam1 = PTZController("192.168.1.64", 80, "admin", "Hikvision321")
 ptz_cam2 = None # Camera 2 is fixed or we don't have credentials for it yet
 
 def generate_frames(camera_url, camera_id, ptz_controller=None):
@@ -456,10 +456,10 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
 
 @app.get("/api/video_feed/1")
 def video_feed_1():
-    url = "rtsp://admin:admin123@192.168.1.64:554/Streaming/Channels/101"
+    url = "rtsp://admin:Hikvision321@192.168.1.64:554/Streaming/Channels/101"
     return StreamingResponse(generate_frames(url, "PTZ-Cam-1", ptz_cam1), media_type="multipart/x-mixed-replace; boundary=frame")
 
 @app.get("/api/video_feed/2")
 def video_feed_2():
-    url = "rtsp://admin:admin123@192.168.1.2:554/Streaming/Channels/101"
+    url = "rtsp://admin:Hikvision321@192.168.1.2:554/Streaming/Channels/101"
     return StreamingResponse(generate_frames(url, "Fixed-Cam-2", ptz_cam2), media_type="multipart/x-mixed-replace; boundary=frame")

@@ -76,7 +76,7 @@ function Dashboard({ token, onLogout }) {
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/alerts/');
+        const response = await fetch('http://127.0.0.1:8000/api/alerts');
         if (response.ok) {
           const data = await response.json();
           const validAlerts = data.filter(a => a && a.behavior_type && a.behavior_type !== 'Unknown');
@@ -84,7 +84,17 @@ function Dashboard({ token, onLogout }) {
         }
       } catch (error) {}
     };
+    const fetchCameras = async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/cameras');
+        if (response.ok) {
+          const data = await response.json();
+          setCameras(data);
+        }
+      } catch (error) {}
+    };
     fetchAlerts();
+    fetchCameras();
 
     const ws = new WebSocket('ws://127.0.0.1:8000/ws/alerts');
     ws.onmessage = (event) => {

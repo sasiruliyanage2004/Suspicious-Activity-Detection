@@ -101,8 +101,11 @@ class CameraRegister(BaseModel):
     camera_id: str
     stream_url: str
 
+active_cameras = {}
+
 @app.post("/api/cameras/register")
 async def register_camera(cam: CameraRegister):
+    active_cameras[cam.camera_id] = cam.stream_url
     msg = {
         "type": "new_camera",
         "camera_id": cam.camera_id,
@@ -110,3 +113,7 @@ async def register_camera(cam: CameraRegister):
     }
     await manager.broadcast(json.dumps(msg))
     return {"status": "success", "message": "Registered"}
+
+@app.get("/api/cameras")
+def get_cameras():
+    return [{"id": k, "streamUrl": v, "name": k} for k, v in active_cameras.items()]
