@@ -53,19 +53,28 @@ def update_threshold(setting: ThresholdSetting):
     GLOBAL_WEAPON_THRESHOLD = setting.threshold
     return {"status": "success", "threshold": GLOBAL_WEAPON_THRESHOLD}
 
+import threading as _threading
+
+# Thread lock so Camera1 and Camera2 don't run YOLO at same time (not thread-safe)
+_detector_lock = _threading.Lock()
+
 # Initialize components globally so they stay loaded
 detector = Detector()
-analyzer = BehaviorAnalyzer()
+# Each camera gets its own BehaviorAnalyzer (independent tracking state)
+analyzer_cam1 = BehaviorAnalyzer()
+analyzer_cam2 = BehaviorAnalyzer()
 api = APIClient()
-# Initialize Emotion Detector (mtcnn=True uses MTCNN which is much more accurate for face detection)
+# Emotion Detector shared but called under lock
 emotion_detector = FER(mtcnn=True)
 
 # Initialize PTZ Controllers
 ptz_cam1 = PTZController("192.168.1.64", 80, "admin", "Hikvision321")
-ptz_cam2 = None # Camera 2 is fixed or we don't have credentials for it yet
+ptz_cam2 = None # Camera 2 is fixed
 
-def generate_frames(camera_url, camera_id, ptz_controller=None):
+def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=None, enable_emotion=True):
     import queue
+    if cam_analyzer is None:
+        cam_analyzer = BehaviorAnalyzer()
 
     # --- Threaded Frame Reader to prevent blocking ---
     raw_frame_queue = queue.Queue(maxsize=2)
@@ -110,6 +119,10 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
 
     frame_counter = 0
     last_emotions = []
+    # Run YOLO every N frames to reduce CPU load
+    # Camera 1 (PTZ): every 2 frames | Camera 2 (Fixed): every 3 frames
+    yolo_interval = 2 if ptz_controller is not None else 3
+    emotion_interval = 30  # Emotion detection every 30 frames (~2s at 15fps)
 
     # Simulation state variables
     start_sim_time = time.time()
@@ -135,14 +148,23 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
                 # Run emotion detection every 10 frames to save processing power
                 frame_counter += 1
                 
-                if frame_counter % 10 == 0:
-                    # Detect emotions in the frame
-                    last_emotions = emotion_detector.detect_emotions(frame)
-                    
-                # 1. Detect & Track
-                pose_results, weapon_results = detector.process_frame(frame, conf_threshold=GLOBAL_WEAPON_THRESHOLD)
+                # Only run YOLO every N frames for performance
+                if frame_counter % yolo_interval == 0:
+                    with _detector_lock:
+                        pose_results, weapon_results = detector.process_frame(frame, conf_threshold=GLOBAL_WEAPON_THRESHOLD)
+                else:
+                    # Skip YOLO this frame - just stream the raw frame
+                    annotated_frame = frame.copy()
+                    ret, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                    continue
+
+                # Only run emotion detection every N frames (expensive)
+                if enable_emotion and frame_counter % emotion_interval == 0:
+                    with _detector_lock:
+                        last_emotions = emotion_detector.detect_emotions(frame)
                 
-                # 2. Analyze Weapon Behavior
+                # 1. Weapon detection already done above
                 weapon_alert = analyzer.analyze_weapons(weapon_results, threshold=GLOBAL_WEAPON_THRESHOLD)
                 if weapon_alert:
                     if weapon_alert.get("is_new"):
@@ -165,16 +187,14 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
                     class_ids = pose_results[0].boxes.cls.int().cpu().tolist()
                     confs = pose_results[0].boxes.conf.cpu().tolist()
                     
-                    # Extract keypoints if Pose model is used
                     all_keypoints = None
                     if hasattr(pose_results[0], 'keypoints') and pose_results[0].keypoints is not None:
                         all_keypoints = pose_results[0].keypoints.xy.cpu().numpy()
                     
                     for i, (box, track_id, class_id, conf) in enumerate(zip(boxes, track_ids, class_ids, confs)):
-                        # In Pose model, person is class 0
                         if class_id == 0:
                             person_keypoints = all_keypoints[i] if all_keypoints is not None else None
-                            alert = analyzer.analyze(track_id, box, person_keypoints, conf)
+                            alert = cam_analyzer.analyze(track_id, box, person_keypoints, conf)
                             
                             # Draw person bounding box manually (removes skeleton lines)
                             x1, y1, x2, y2 = box
@@ -214,7 +234,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
                             person_tracks.append(track_id)
                             person_boxes.append(box)
                             
-                    group_alert = analyzer.analyze_group_behavior(person_tracks, person_boxes)
+                    group_alert = cam_analyzer.analyze_group_behavior(person_tracks, person_boxes)
                     if group_alert:
                         if group_alert.get("is_new"):
                             api.send_alert(
@@ -238,7 +258,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
                             cv2.putText(annotated_frame, weapon_type, (int(x1), int(y1)-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
                 # 4. Render Emotion Detection Results & Trigger Alerts
-                if last_emotions:
+                if enable_emotion and last_emotions:
                     for emotion_data in last_emotions:
                         box = emotion_data["box"]
                         emotions = emotion_data["emotions"]
@@ -248,7 +268,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
                             dominant_emotion = max(emotions, key=emotions.get)
                             confidence = emotions[dominant_emotion]
                             
-                            emotion_alert = analyzer.analyze_emotion(dominant_emotion, confidence)
+                            emotion_alert = cam_analyzer.analyze_emotion(dominant_emotion, confidence)
                             if emotion_alert:
                                 if emotion_alert.get("is_new"):
                                     api.send_alert(
@@ -489,9 +509,16 @@ def generate_frames(camera_url, camera_id, ptz_controller=None):
 @app.get("/api/video_feed/1")
 def video_feed_1():
     url = "rtsp://admin:Hikvision321@192.168.1.64:554/Streaming/Channels/101"
-    return StreamingResponse(generate_frames(url, "PTZ-Cam-1", ptz_cam1), media_type="multipart/x-mixed-replace; boundary=frame")
+    return StreamingResponse(
+        generate_frames(url, "PTZ-Cam-1", ptz_cam1, cam_analyzer=analyzer_cam1, enable_emotion=True),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
 
 @app.get("/api/video_feed/2")
 def video_feed_2():
     url = "rtsp://admin:Hikvision321@192.168.1.2:554/Streaming/Channels/101"
-    return StreamingResponse(generate_frames(url, "Fixed-Cam-2", ptz_cam2), media_type="multipart/x-mixed-replace; boundary=frame")
+    return StreamingResponse(
+        # Camera 2: no emotion detection (saves ~40% CPU), own analyzer
+        generate_frames(url, "Fixed-Cam-2", ptz_cam2, cam_analyzer=analyzer_cam2, enable_emotion=False),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
