@@ -13,6 +13,7 @@ import numpy as np
 import threading
 import requests
 from stream.ptz_controller import PTZController
+from core.telegram_notifier import notifier
 app = FastAPI()
 
 from config import settings
@@ -181,6 +182,10 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                             confidence=weapon_alert["confidence"],
                             details=weapon_alert["details"]
                         )
+                        notifier.send_alert(
+                            f"CRITICAL: {weapon_alert['behavior']} detected on {camera_id} with {weapon_alert['confidence']*100:.1f}% confidence.",
+                            frame
+                        )
                     cv2.putText(frame, f"CRITICAL: {weapon_alert['behavior']}", (10, 90), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
 
@@ -218,6 +223,13 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                                         confidence=alert["confidence"],
                                         details=alert["details"]
                                     )
+                                    
+                                    # Send telegram alert for high severity
+                                    if "Falling" in alert["behavior"] or "Suspicious" in alert["behavior"]:
+                                        notifier.send_alert(
+                                            f"ALERT: {alert['behavior']} detected on {camera_id}",
+                                            annotated_frame
+                                        )
                                 
                                 # Draw warning on frame continuously
                                 cv2.putText(annotated_frame, f"ALERT: {alert['behavior']}", (10, 50), 
@@ -249,6 +261,10 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                                 behavior_type=group_alert["behavior"],
                                 confidence=group_alert["confidence"],
                                 details=group_alert["details"]
+                            )
+                            notifier.send_alert(
+                                f"CRITICAL: {group_alert['behavior']} detected on {camera_id}",
+                                annotated_frame
                             )
                         cv2.putText(annotated_frame, f"CRITICAL: {group_alert['behavior']}", (10, 170), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
