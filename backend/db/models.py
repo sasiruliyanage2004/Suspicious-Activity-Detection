@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime
-import datetime
-from database import Base
+from datetime import datetime
+from db.database import Base
 
 class User(Base):
     __tablename__ = "users"
@@ -16,5 +16,5 @@ class Alert(Base):
     camera_id = Column(String, index=True)
     behavior_type = Column(String, index=True)
     confidence = Column(Float)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
     details = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)

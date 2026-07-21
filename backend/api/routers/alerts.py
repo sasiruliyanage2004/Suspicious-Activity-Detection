@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, BackgroundTasks
 import json
-from ws_manager import manager
+from core.ws_manager import manager
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import datetime
-import models
-from database import get_db
+from db import models
+from db.database import get_db
 
 router = APIRouter(
     prefix="/alerts",

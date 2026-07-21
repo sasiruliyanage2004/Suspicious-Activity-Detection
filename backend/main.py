@@ -1,23 +1,24 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import json
-from database import engine, Base, get_db
-import routers.alerts as alerts
+from db.database import engine, Base, get_db
+import api.routers.alerts as alerts
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta
-from models import User
+from db.models import User
 from pydantic import BaseModel
 import psutil
+from core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-SECRET_KEY = "scifi_cyber_secret_key"
-ALGORITHM = "HS256"
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Suspicious Behavior Detection API")
+app = FastAPI(title=settings.PROJECT_NAME)
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,7 +30,7 @@ app.add_middleware(
 
 app.include_router(alerts.router)
 
-from ws_manager import manager
+from core.ws_manager import manager
 
 @app.websocket("/ws/alerts")
 async def websocket_endpoint(websocket: WebSocket):
