@@ -508,7 +508,8 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
 
 @app.get("/api/video_feed/1")
 def video_feed_1():
-    url = "rtsp://admin:Hikvision321@192.168.1.64:554/Streaming/Channels/101"
+    # Use Hikvision Sub-stream (102) for real-time OpenCV processing to eliminate lag
+    url = "rtsp://admin:Hikvision321@192.168.1.64:554/Streaming/Channels/102"
     return StreamingResponse(
         generate_frames(url, "PTZ-Cam-1", ptz_cam1, cam_analyzer=analyzer_cam1, enable_emotion=True),
         media_type="multipart/x-mixed-replace; boundary=frame"
@@ -516,7 +517,8 @@ def video_feed_1():
 
 @app.get("/api/video_feed/2")
 def video_feed_2():
-    url = "rtsp://admin:Hikvision321@192.168.1.2:554/Streaming/Channels/101"
+    # Use Hikvision Sub-stream (102) for real-time OpenCV processing to eliminate lag
+    url = "rtsp://admin:Hikvision321@192.168.1.2:554/Streaming/Channels/102"
     return StreamingResponse(
         # Camera 2: no emotion detection (saves ~40% CPU), own analyzer
         generate_frames(url, "Fixed-Cam-2", ptz_cam2, cam_analyzer=analyzer_cam2, enable_emotion=False),
