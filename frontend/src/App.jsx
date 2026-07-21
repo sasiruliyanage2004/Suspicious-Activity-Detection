@@ -3,6 +3,7 @@ import { LineChart, Line, BarChart, Bar, Tooltip, ResponsiveContainer, XAxis } f
 import AuthScreen from './components/layout/AuthScreen';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
+import ZoneDrawer from './components/cameras/ZoneDrawer';
 import { playSiren } from './utils/audioDeterrence';
 
 function Dashboard({ token, onLogout }) {
@@ -224,7 +225,7 @@ function Dashboard({ token, onLogout }) {
             </div>
           )}
 
-          {currentView === 'Live Feeds' && selectedCamera && (
+           {currentView === 'Live Feeds' && selectedCamera && (
              <div className="absolute inset-0 m-gutter bg-surface-container-low border border-primary/40 hud-bracket scanline-container overflow-hidden flex flex-col z-20">
                 <div className="p-4 bg-black/80 flex justify-between items-center z-20">
                    <button onClick={() => setSelectedCamera(null)} className="font-label-caps text-primary hover:text-white flex items-center gap-2">
@@ -234,6 +235,7 @@ function Dashboard({ token, onLogout }) {
                 </div>
                 <div className="flex-1 relative bg-black flex items-center justify-center">
                   <img src={selectedCamera.streamUrl} className="max-w-full max-h-full object-contain" onError={handleVideoError} />
+                  <ZoneDrawer cameraId={selectedCamera.id} onClose={() => {}} />
                 </div>
              </div>
           )}

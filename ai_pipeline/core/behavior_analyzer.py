@@ -1,4 +1,6 @@
 import time
+import cv2
+import numpy as np
 
 class BehaviorAnalyzer:
     def __init__(self):
@@ -20,11 +22,20 @@ class BehaviorAnalyzer:
         self.violence_alerted = False
         self.last_violence_time = 0
     
-    def analyze(self, track_id, bbox, keypoints=None, conf=0.9):
+    def analyze(self, track_id, bbox, keypoints=None, conf=0.9, zone_points=None):
         # Extract center of bounding box
         x1, y1, x2, y2 = bbox
         cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
         
+        # Check intrusion zone if defined
+        if zone_points and len(zone_points) >= 3:
+            pts = np.array(zone_points, np.int32)
+            pts = pts.reshape((-1, 1, 2))
+            # If distance is < 0, point is outside the polygon
+            dist = cv2.pointPolygonTest(pts, (cx, cy), False)
+            if dist < 0:
+                return None # Ignore person outside the zone
+
         current_time = time.time()
         
         if track_id not in self.track_history:

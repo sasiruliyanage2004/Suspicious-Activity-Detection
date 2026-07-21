@@ -118,3 +118,17 @@ async def register_camera(cam: CameraRegister):
 @app.get("/api/cameras")
 def get_cameras():
     return [{"id": k, "streamUrl": v, "name": k} for k, v in active_cameras.items()]
+
+camera_zones = {}
+
+class ZoneData(BaseModel):
+    points: list[list[int]]  # List of [x, y] coordinates
+
+@app.post("/api/cameras/{camera_id}/zone")
+def set_camera_zone(camera_id: str, zone: ZoneData):
+    camera_zones[camera_id] = zone.points
+    return {"status": "success"}
+
+@app.get("/api/cameras/{camera_id}/zone")
+def get_camera_zone(camera_id: str):
+    return {"points": camera_zones.get(camera_id, [])}

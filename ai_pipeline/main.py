@@ -133,6 +133,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
     emotion_alert_sent = False
     weapon_alert_sent = False
     fall_alert_sent = False
+    current_zone = []
 
     try:
         while True:
@@ -146,6 +147,10 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                     
                 # Flip the frame horizontally to fix mirror effect
                 frame = cv2.flip(frame, 1)
+                
+                # Fetch zone periodically
+                if frame_counter % 30 == 0:
+                    current_zone = api.get_zone(camera_id)
                 
                 # Run emotion detection every 10 frames to save processing power
                 frame_counter += 1
@@ -196,7 +201,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                     for i, (box, track_id, class_id, conf) in enumerate(zip(boxes, track_ids, class_ids, confs)):
                         if class_id == 0:
                             person_keypoints = all_keypoints[i] if all_keypoints is not None else None
-                            alert = cam_analyzer.analyze(track_id, box, person_keypoints, conf)
+                            alert = cam_analyzer.analyze(track_id, box, person_keypoints, conf, zone_points=current_zone)
                             
                             # Draw person bounding box manually (removes skeleton lines)
                             x1, y1, x2, y2 = box
@@ -247,6 +252,14 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                             )
                         cv2.putText(annotated_frame, f"CRITICAL: {group_alert['behavior']}", (10, 170), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+                
+                # Draw intrusion zone
+                if current_zone and len(current_zone) >= 3:
+                    pts = np.array(current_zone, np.int32)
+                    pts = pts.reshape((-1, 1, 2))
+                    cv2.polylines(annotated_frame, [pts], True, (0, 0, 255), 2)
+                    cv2.putText(annotated_frame, "INTRUSION ZONE ACTIVE", (10, 210), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
                 
                 # Render weapon detection results on top
                 if weapon_results and len(weapon_results) > 0 and weapon_results[0].boxes is not None and len(weapon_results[0].boxes) > 0:

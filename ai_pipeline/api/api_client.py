@@ -20,3 +20,14 @@ class APIClient:
                 print(f"Failed to send alert: {response.text}")
         except Exception as e:
             print(f"Error connecting to backend: {e}")
+            
+    def get_zone(self, camera_id: str):
+        try:
+            # We use api/cameras/{camera_id}/zone
+            response = requests.get(f"{self.base_url}/api/cameras/{camera_id}/zone", timeout=2)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("points", [])
+        except Exception as e:
+            pass
+        return []
