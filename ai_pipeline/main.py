@@ -3,26 +3,28 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from detector import Detector
-from behavior_analyzer import BehaviorAnalyzer
-from api_client import APIClient
+from core.detector import Detector
+from core.behavior_analyzer import BehaviorAnalyzer
+from api.api_client import APIClient
 from fer.fer import FER
 import time
 import numpy as np
 
 import threading
 import requests
-from ptz_controller import PTZController
+from stream.ptz_controller import PTZController
 app = FastAPI()
+
+from config import settings
 
 def auto_register_camera():
     while True:
         try:
-            requests.post("http://127.0.0.1:8000/api/cameras/register", json={
+            requests.post(f"{settings.BACKEND_URL}/api/cameras/register", json={
                 "camera_id": "PTZ-Cam-1",
                 "stream_url": "http://127.0.0.1:8002/api/video_feed/1"
             })
-            requests.post("http://127.0.0.1:8000/api/cameras/register", json={
+            requests.post(f"{settings.BACKEND_URL}/api/cameras/register", json={
                 "camera_id": "Fixed-Cam-2",
                 "stream_url": "http://127.0.0.1:8002/api/video_feed/2"
             })
@@ -45,7 +47,7 @@ app.add_middleware(
 class ThresholdSetting(BaseModel):
     threshold: float
 
-GLOBAL_WEAPON_THRESHOLD = 0.65
+GLOBAL_WEAPON_THRESHOLD = settings.WEAPON_CONFIDENCE_THRESHOLD
 
 @app.post("/api/settings/threshold")
 def update_threshold(setting: ThresholdSetting):
@@ -68,7 +70,7 @@ api = APIClient()
 emotion_detector = FER(mtcnn=True)
 
 # Initialize PTZ Controllers
-ptz_cam1 = PTZController("192.168.1.64", 80, "admin", "Hikvision321")
+ptz_cam1 = PTZController(settings.CAMERA_1_IP, settings.CAMERA_1_PORT, settings.CAMERA_1_USER, settings.CAMERA_1_PASS)
 ptz_cam2 = None # Camera 2 is fixed
 
 def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=None, enable_emotion=True):
@@ -509,7 +511,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
 @app.get("/api/video_feed/1")
 def video_feed_1():
     # Use Hikvision Sub-stream (102) for real-time OpenCV processing to eliminate lag
-    url = "rtsp://admin:Hikvision321@192.168.1.64:554/Streaming/Channels/102"
+    url = settings.CAMERA_1_RTSP_URL
     return StreamingResponse(
         generate_frames(url, "PTZ-Cam-1", ptz_cam1, cam_analyzer=analyzer_cam1, enable_emotion=True),
         media_type="multipart/x-mixed-replace; boundary=frame"
@@ -518,7 +520,7 @@ def video_feed_1():
 @app.get("/api/video_feed/2")
 def video_feed_2():
     # Use Hikvision Sub-stream (102) for real-time OpenCV processing to eliminate lag
-    url = "rtsp://admin:Hikvision321@192.168.1.2:554/Streaming/Channels/102"
+    url = settings.CAMERA_2_RTSP_URL
     return StreamingResponse(
         # Camera 2: no emotion detection (saves ~40% CPU), own analyzer
         generate_frames(url, "Fixed-Cam-2", ptz_cam2, cam_analyzer=analyzer_cam2, enable_emotion=False),
