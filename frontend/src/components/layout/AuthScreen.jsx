@@ -8,7 +8,7 @@ export default function AuthScreen({ onLogin }) {
     e.preventDefault();
     setError('');
     if (password === 'admin123') {
-      onLogin('aegis_command_token');
+      onLogin('aethra_vision_token');
     } else {
       setError('ACCESS DENIED. INCORRECT SECURITY CIPHER.');
     }
@@ -23,7 +23,7 @@ export default function AuthScreen({ onLogin }) {
           <div className="w-16 h-16 rounded-full border border-primary flex justify-center items-center mb-4 text-primary bg-primary/5 shadow-[0_0_15px_rgba(0,240,255,0.2)]">
             <span className="material-symbols-outlined text-3xl">security</span>
           </div>
-          <h1 className="font-label-caps text-lg font-bold tracking-widest text-primary uppercase mt-2 glow-cyan">AEGIS_COMMAND</h1>
+          <h1 className="font-label-caps text-lg font-bold tracking-widest text-primary uppercase mt-2 glow-cyan">AETHRA_VISION</h1>
           <h2 className="font-data-mono text-[10px] text-on-surface-variant tracking-widest uppercase mt-2">Initialize Authorization</h2>
         </div>
 

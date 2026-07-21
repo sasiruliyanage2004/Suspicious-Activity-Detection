@@ -5,7 +5,7 @@ export default function Sidebar({ navItems, currentView, setCurrentView, alerts,
     <aside className="bg-[#070b14]/60 backdrop-blur-xl h-full w-64 border-r border-white/10 flex flex-col py-panel-padding shadow-[0_0_15px_rgba(0,219,233,0.1)] z-40 shrink-0">
       <div className="px-6 mb-10 flex items-center gap-3">
          <span className="material-symbols-outlined text-primary text-3xl">security</span>
-         <span className="font-headline-md text-sm font-bold text-white tracking-widest uppercase">Sentinel AI</span>
+         <span className="font-headline-md text-sm font-bold text-white tracking-widest uppercase">Aethra Vision</span>
       </div>
       <nav className="flex-1 space-y-1">
         {navItems.map(item => (

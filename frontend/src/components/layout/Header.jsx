@@ -4,7 +4,7 @@ export default function Header({ timeStr, isMuted, setIsMuted, sensitivity, hand
   return (
     <header className="bg-[#070b14]/60 backdrop-blur-xl w-full h-16 border-b border-white/10 flex justify-between items-center px-margin-edge sticky top-0 z-50 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
       <div className="flex items-center gap-8">
-        <span className="font-label-caps text-label-caps font-bold text-primary tracking-widest uppercase glow-cyan">AEGIS_COMMAND</span>
+        <span className="font-label-caps text-label-caps font-bold text-primary tracking-widest uppercase glow-cyan">AETHRA_VISION</span>
         <div className="flex items-center gap-4 border-l border-white/10 pl-6 h-8 hidden md:flex">
           <span className="font-data-mono text-data-mono text-primary-fixed-dim bg-primary/10 px-3 py-1 rounded-sm border border-primary/20 animate-[pulse-glow_3s_infinite]">SYSTEM ONLINE</span>
           <div className="flex items-center gap-3">

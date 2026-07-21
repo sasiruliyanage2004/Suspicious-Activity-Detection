@@ -29,7 +29,7 @@ class TelegramNotifier:
                 ret, buffer = cv2.imencode('.jpg', frame)
                 if ret:
                     files = {'photo': ('alert.jpg', buffer.tobytes(), 'image/jpeg')}
-                    data = {'chat_id': self.chat_id, 'caption': f"🚨 AEGIS CRITICAL ALERT 🚨\n{message}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"}
+                    data = {'chat_id': self.chat_id, 'caption': f"🚨 AETHRA VISION ALERT 🚨\n{message}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"}
                     
                     response = requests.post(photo_url, data=data, files=files, timeout=5)
                     return
@@ -37,7 +37,7 @@ class TelegramNotifier:
             # Fallback to text message if no image or encoding failed
             data = {
                 "chat_id": self.chat_id,
-                "text": f"🚨 AEGIS CRITICAL ALERT 🚨\n{message}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                "text": f"🚨 AETHRA VISION ALERT 🚨\n{message}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             }
             requests.post(url, data=data, timeout=5)
             
