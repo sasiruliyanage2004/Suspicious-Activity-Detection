@@ -20,8 +20,8 @@ export default function AuthScreen({ onLogin }) {
       
       <div className="bg-[#0f1c2f]/90 backdrop-blur-xl rounded-lg w-96 p-8 relative z-10 border border-primary/20 shadow-[0_0_30px_rgba(0,240,255,0.15)] hud-bracket">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-full border border-primary flex justify-center items-center mb-4 text-primary bg-primary/5 shadow-[0_0_15px_rgba(0,240,255,0.2)]">
-            <span className="material-symbols-outlined text-3xl">security</span>
+          <div className="w-24 h-24 rounded-full flex justify-center items-center mb-4 perspective-[1000px]">
+            <img src="/logo.png" alt="Aethra Vision Logo" className="logo-3d w-full h-full object-cover rounded-full border-2 border-primary/50" />
           </div>
           <h1 className="font-label-caps text-lg font-bold tracking-widest text-primary uppercase mt-2 glow-cyan">AETHRA_VISION</h1>
           <h2 className="font-data-mono text-[10px] text-on-surface-variant tracking-widest uppercase mt-2">Initialize Authorization</h2>
