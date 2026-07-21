@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, BarChart, Bar, Tooltip, ResponsiveContainer, XAxis } from 'recharts';
+import AuthScreen from './components/layout/AuthScreen';
+import Header from './components/layout/Header';
+import Sidebar from './components/layout/Sidebar';
+import { playSiren } from './utils/audioDeterrence';
 
 function Dashboard({ token, onLogout }) {
   const [alerts, setAlerts] = useState([]);
@@ -112,7 +116,12 @@ function Dashboard({ token, onLogout }) {
           
           const isHighThreat = ['weapon', 'gun', 'knife', 'grenade', 'suspicious activity', 'falling'].some(w => message.behavior_type.toLowerCase().includes(w));
           if (isHighThreat) {
-            playVoiceAlert(`Warning. ${message.behavior_type} detected on ${message.camera_id}.`);
+            if (!isMutedRef.current) {
+              playSiren(2500); // Play siren for 2.5s
+              setTimeout(() => {
+                playVoiceAlert(`Warning. ${message.behavior_type} detected on ${message.camera_id}.`);
+              }, 2500);
+            }
           }
         }
       } catch (e) {}
@@ -153,79 +162,23 @@ function Dashboard({ token, onLogout }) {
 
   return (
     <div className="bg-background text-on-background font-body-base overflow-hidden selection:bg-primary/30 h-screen w-screen flex flex-col">
-      {/* Top AppBar */}
-      <header className="bg-[#070b14]/60 backdrop-blur-xl w-full h-16 border-b border-white/10 flex justify-between items-center px-margin-edge sticky top-0 z-50 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
-        <div className="flex items-center gap-8">
-          <span className="font-label-caps text-label-caps font-bold text-primary tracking-widest uppercase glow-cyan">AEGIS_COMMAND</span>
-          <div className="flex items-center gap-4 border-l border-white/10 pl-6 h-8 hidden md:flex">
-            <span className="font-data-mono text-data-mono text-primary-fixed-dim bg-primary/10 px-3 py-1 rounded-sm border border-primary/20 animate-[pulse-glow_3s_infinite]">SYSTEM ONLINE</span>
-            <div className="flex items-center gap-3">
-              <span className="font-label-caps text-[10px] text-on-surface-variant">CONFIDENCE_THRESHOLD</span>
-              <input type="range" min="0" max="100" value={sensitivity} onChange={handleSensitivityChange} className="w-32 h-1 bg-surface-variant rounded-full appearance-none cursor-pointer accent-primary-fixed-dim"/>
-              <span className="font-data-mono text-data-mono text-primary">{sensitivity}%</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-6">
-          <div className="flex flex-col items-end">
-            <span className="font-data-mono text-data-mono text-primary tracking-tighter">{timeStr}</span>
-            <span className="font-label-caps text-[9px] text-on-surface-variant tracking-widest">REALTIME_SYNC_ENABLED</span>
-          </div>
-          <div className="flex gap-4 border-l border-white/10 pl-6 items-center">
-            <span 
-              onClick={() => setIsMuted(!isMuted)} 
-              className={`material-symbols-outlined cursor-pointer transition-all ${isMuted ? 'text-secondary hover:text-secondary/80' : 'text-on-surface-variant hover:text-primary'}`}
-              title={isMuted ? "Unmute Voice Alerts" : "Mute Voice Alerts"}
-            >
-              {isMuted ? 'notifications_off' : 'notifications_active'}
-            </span>
-            <span className="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer transition-all">admin_panel_settings</span>
-          </div>
-          <div className="flex items-center gap-3 bg-white/5 px-3 py-1.5 rounded border border-white/5">
-            <div className="w-8 h-8 rounded-sm bg-surface-container-high border border-primary/20 overflow-hidden flex items-center justify-center text-primary">
-              <span className="material-symbols-outlined">shield_person</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-label-caps text-[11px] leading-none text-primary">Admin</span>
-              <button onClick={onLogout} className="font-label-caps text-[9px] leading-none text-on-surface-variant hover:text-secondary cursor-pointer transition-colors mt-1 uppercase text-left">LOG_OUT</button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header 
+        timeStr={timeStr} 
+        isMuted={isMuted} 
+        setIsMuted={setIsMuted} 
+        sensitivity={sensitivity} 
+        handleSensitivityChange={handleSensitivityChange} 
+        onLogout={onLogout} 
+      />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar Navigation */}
-        <aside className="bg-[#070b14]/60 backdrop-blur-xl h-full w-64 border-r border-white/10 flex flex-col py-panel-padding shadow-[0_0_15px_rgba(0,219,233,0.1)] z-40 shrink-0">
-          <div className="px-6 mb-10 flex items-center gap-3">
-             <span className="material-symbols-outlined text-primary text-3xl">security</span>
-             <span className="font-headline-md text-sm font-bold text-white tracking-widest uppercase">Sentinel AI</span>
-          </div>
-          <nav className="flex-1 space-y-1">
-            {navItems.map(item => (
-              <button 
-                key={item.name} 
-                onClick={() => setCurrentView(item.name)}
-                className={`w-full flex items-center gap-3 px-6 py-3 transition-all duration-300 ${currentView === item.name ? 'text-primary border-l-4 border-primary bg-primary/10 shadow-[inset_10px_0_15px_-10px_rgba(0,219,233,0.3)] brightness-125' : 'text-on-surface-variant hover:text-primary hover:bg-white/5 border-l-4 border-transparent'}`}
-              >
-                <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-                <span className="font-label-caps text-label-caps flex-1 text-left">{item.name}</span>
-                {item.name === 'Live Feeds' && <span className="w-2 h-2 rounded-full bg-primary-fixed-dim animate-pulse shadow-[0_0_8px_#00f0ff]"></span>}
-                {item.name === 'Alerts' && alerts.length > 0 && <span className="bg-secondary text-on-secondary text-[10px] font-bold px-1.5 py-0.5 rounded-sm">{alerts.length}</span>}
-              </button>
-            ))}
-          </nav>
-          <div className="px-6 mt-auto">
-            <div className="p-4 rounded bg-surface-container-lowest border border-white/5">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-label-caps text-[10px] text-on-surface-variant">OPS_UNIT_01</span>
-                <span className="font-data-mono text-[10px] text-primary">LOAD: {systemHealth.cpu_percent.toFixed(0)}%</span>
-              </div>
-              <div className="w-full bg-surface-variant h-1 rounded-full overflow-hidden">
-                <div className="bg-primary h-full transition-all duration-1000" style={{ width: `${systemHealth.cpu_percent}%` }}></div>
-              </div>
-            </div>
-          </div>
-        </aside>
+        <Sidebar 
+          navItems={navItems} 
+          currentView={currentView} 
+          setCurrentView={setCurrentView} 
+          alerts={alerts} 
+          systemHealth={systemHealth} 
+        />
 
         {/* Main Content Area */}
         <main className="flex-1 bg-background p-gutter overflow-y-auto custom-scrollbar relative">
@@ -505,66 +458,7 @@ function Dashboard({ token, onLogout }) {
   );
 }
 
-function AuthScreen({ onLogin }) {
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
-    if (password === 'admin123') {
-      onLogin('aegis_command_token');
-    } else {
-      setError('ACCESS DENIED. INCORRECT SECURITY CIPHER.');
-    }
-  };
-
-  return (
-    <div className="bg-background text-on-background font-body-base h-screen w-screen flex items-center justify-center relative overflow-hidden">
-      <div className="scanline-container absolute inset-0 opacity-30"></div>
-      
-      <div className="bg-[#0f1c2f]/90 backdrop-blur-xl rounded-lg w-96 p-8 relative z-10 border border-primary/20 shadow-[0_0_30px_rgba(0,240,255,0.15)] hud-bracket">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-full border border-primary flex justify-center items-center mb-4 text-primary bg-primary/5 shadow-[0_0_15px_rgba(0,240,255,0.2)]">
-            <span className="material-symbols-outlined text-3xl">security</span>
-          </div>
-          <h1 className="font-label-caps text-lg font-bold tracking-widest text-primary uppercase mt-2 glow-cyan">AEGIS_COMMAND</h1>
-          <h2 className="font-data-mono text-[10px] text-on-surface-variant tracking-widest uppercase mt-2">Initialize Authorization</h2>
-        </div>
-
-        {error && (
-          <div className="mb-6 p-3 rounded-sm border text-[10px] font-data-mono text-center tracking-widest bg-error-container border-error text-error">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="relative">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant text-sm">key</span>
-            <input 
-              type="password" 
-              placeholder="SECURITY CIPHER" 
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full bg-surface-container-lowest border border-outline-variant rounded-sm px-10 py-3.5 text-xs text-white focus:outline-none focus:border-primary transition-colors placeholder-on-surface-variant/50 font-data-mono tracking-wider"
-              required
-            />
-          </div>
-
-          <button type="submit" className="w-full py-3.5 rounded-sm text-xs font-label-caps tracking-widest uppercase mt-4 bg-primary/10 border border-primary text-primary hover:bg-primary/20 transition-all glow-cyan hover:shadow-[0_0_15px_rgba(0,240,255,0.3)]">
-            Authenticate
-          </button>
-        </form>
-
-        <div className="mt-8 text-center">
-          <span className="font-label-caps text-[9px] text-on-surface-variant uppercase tracking-widest">
-            Exhibition Mode Active
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('auth_token'));
