@@ -2,6 +2,7 @@ import os
 import requests
 import cv2
 import threading
+import time
 from datetime import datetime
 
 class TelegramNotifier:
@@ -9,6 +10,61 @@ class TelegramNotifier:
         self.bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
         self.chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
         self.enabled = bool(self.bot_token and self.chat_id)
+        self.welcome_image_path = os.path.join(os.path.dirname(__file__), "welcome.png")
+        
+        # Start the polling thread if enabled
+        if self.enabled:
+            threading.Thread(target=self._poll_updates, daemon=True).start()
+            
+    def _poll_updates(self):
+        offset = 0
+        while True:
+            try:
+                url = f"https://api.telegram.org/bot{self.bot_token}/getUpdates?offset={offset}&timeout=10"
+                resp = requests.get(url, timeout=15)
+                data = resp.json()
+                
+                if data.get("ok"):
+                    for result in data.get("result", []):
+                        offset = result["update_id"] + 1
+                        
+                        message = result.get("message", {})
+                        text = message.get("text", "")
+                        chat_id = message.get("chat", {}).get("id")
+                        
+                        if text == "/start":
+                            self._send_welcome(chat_id)
+            except Exception as e:
+                # Silently pass on network errors during polling
+                pass
+            time.sleep(2)
+            
+    def _send_welcome(self, chat_id):
+        welcome_text = (
+            "🛡️ *Welcome to Aethra Vision Command Center* 🛡️\n\n"
+            "I am the central notification node for your AI Security System. "
+            "I am online 24/7 to provide you with real-time updates directly from your surveillance feeds.\n\n"
+            "*Capabilities:*\n"
+            "⚠️ Real-time weapon detection alerts\n"
+            "🥊 Violence and anomalous behavior tracking\n"
+            "📸 Instant snapshot evidence delivery\n"
+            "📍 Intrusion zone monitoring\n\n"
+            "System status: _Online and monitoring._"
+        )
+        
+        try:
+            if os.path.exists(self.welcome_image_path):
+                url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
+                with open(self.welcome_image_path, "rb") as f:
+                    files = {"photo": ("welcome.png", f, "image/png")}
+                    data = {"chat_id": chat_id, "caption": welcome_text, "parse_mode": "Markdown"}
+                    requests.post(url, data=data, files=files, timeout=10)
+            else:
+                url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+                data = {"chat_id": chat_id, "text": welcome_text, "parse_mode": "Markdown"}
+                requests.post(url, data=data, timeout=5)
+        except Exception as e:
+            print(f"Failed to send welcome message: {e}")
         
     def send_alert(self, message: str, frame=None):
         if not self.enabled:
