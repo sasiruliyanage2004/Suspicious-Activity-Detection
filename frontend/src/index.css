@@ -239,6 +239,13 @@ body {
     0% { transform: translateY(-100%); }
     100% { transform: translateY(100%); }
 }
+
+@keyframes scanline {
+    0% { transform: translateY(-100%); opacity: 0; }
+    50% { opacity: 0.5; }
+    100% { transform: translateY(100%); opacity: 0; }
+}
+
 .scanline-container::after {
     content: "";
     position: absolute;
