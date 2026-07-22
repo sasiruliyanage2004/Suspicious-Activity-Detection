@@ -103,14 +103,31 @@ void main() {
     };
   }, []);
 
-  const handleSubmit = (e) => {
+  const [mfaStep, setMfaStep] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
+
+  const handleLoginSubmit = (e) => {
     e.preventDefault();
     setError('');
-    // Mock login logic
-    if (password === 'admin123') {
-      onLogin('aethra_vision_token');
+    // Mock JWT backend validation
+    if (email.toLowerCase() === 'admin@aethra.sec' && password === 'admin123') {
+      // Transition to MFA Step
+      setMfaStep(true);
     } else {
-      setError('ACCESS DENIED. INCORRECT SECURITY CIPHER.');
+      setError('ACCESS DENIED. INVALID CREDENTIALS.');
+    }
+  };
+
+  const handleMfaSubmit = (e) => {
+    e.preventDefault();
+    setError('');
+    // Mock MFA validation (accepts 000000 for demo)
+    if (mfaCode === '000000') {
+      // Generate a mock JWT token and log in
+      const mockJwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI...'; 
+      onLogin(mockJwt);
+    } else {
+      setError('MFA FAILURE. INVALID SECURITY TOKEN.');
     }
   };
 
@@ -159,63 +176,98 @@ void main() {
           )}
 
           {/* Login Form */}
-          <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5 relative">
-            
-            {/* Email Field */}
-            <div className="flex flex-col gap-1">
-              <label className="font-label-caps text-[10px] text-primary opacity-70 uppercase tracking-wider ml-1">Terminal ID (Email)</label>
-              <div className="relative">
-                <input 
-                  type="text" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ADMIN@AETHRA.SEC" 
-                  className="w-full bg-transparent border-0 border-b border-[#3b494b] py-2 px-1 font-data-mono text-sm text-primary placeholder:text-outline/30 focus:border-primary focus:shadow-[0_4px_12px_-4px_rgba(0,240,255,0.3)] focus:outline-none transition-all duration-300"
-                />
+          {!mfaStep ? (
+            <form onSubmit={handleLoginSubmit} className="w-full flex flex-col gap-5 relative">
+              {/* Email Field */}
+              <div className="flex flex-col gap-1">
+                <label className="font-label-caps text-[10px] text-primary opacity-70 uppercase tracking-wider ml-1">Terminal ID (Email)</label>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="admin@aethra.sec" 
+                    className="w-full bg-transparent border-0 border-b border-[#3b494b] py-2 px-1 font-data-mono text-sm text-primary placeholder:text-outline/30 focus:border-primary focus:shadow-[0_4px_12px_-4px_rgba(0,240,255,0.3)] focus:outline-none transition-all duration-300"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Password Field */}
-            <div className="flex flex-col gap-1">
-              <label className="font-label-caps text-[10px] text-primary opacity-70 uppercase tracking-wider ml-1">Access Protocol (Password)</label>
-              <div className="relative flex items-center">
-                <input 
-                  type={showPassword ? 'text' : 'password'} 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••" 
-                  className="w-full bg-transparent border-0 border-b border-[#3b494b] py-2 px-1 font-data-mono text-sm text-primary placeholder:text-outline/30 focus:border-primary focus:shadow-[0_4px_12px_-4px_rgba(0,240,255,0.3)] focus:outline-none transition-all duration-300 pr-10"
-                />
+              {/* Password Field */}
+              <div className="flex flex-col gap-1">
+                <label className="font-label-caps text-[10px] text-primary opacity-70 uppercase tracking-wider ml-1">Access Protocol (Password)</label>
+                <div className="relative flex items-center">
+                  <input 
+                    type={showPassword ? 'text' : 'password'} 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••••" 
+                    className="w-full bg-transparent border-0 border-b border-[#3b494b] py-2 px-1 font-data-mono text-sm text-primary placeholder:text-outline/30 focus:border-primary focus:shadow-[0_4px_12px_-4px_rgba(0,240,255,0.3)] focus:outline-none transition-all duration-300 pr-10"
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-0 text-primary/40 hover:text-primary transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-lg">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Area */}
+              <div className="mt-4 flex flex-col gap-4">
                 <button 
-                  type="button" 
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-0 text-primary/40 hover:text-primary transition-colors"
+                  type="submit"
+                  className="relative overflow-hidden w-full bg-primary/10 border border-primary text-primary font-data-mono text-sm py-4 px-6 uppercase tracking-[0.15em] hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] hover:scale-[1.02] transition-all duration-300 group"
                 >
-                  <span className="material-symbols-outlined text-lg">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    Initialize Authorization
+                    <span className="material-symbols-outlined text-[18px]">lock_open</span>
+                  </span>
+                  <div className="absolute top-0 left-0 w-full h-[20px] bg-gradient-to-b from-transparent via-primary/40 to-transparent animate-[scanline_3s_linear_infinite] pointer-events-none opacity-50"></div>
                 </button>
+                
+                <div className="flex justify-between items-center px-1">
+                  <button type="button" className="font-label-caps text-[9px] text-on-surface-variant hover:text-primary transition-colors uppercase tracking-tight">Request Credentials</button>
+                  <button type="button" className="font-label-caps text-[9px] text-on-surface-variant hover:text-primary transition-colors uppercase tracking-tight">System Status</button>
+                </div>
               </div>
-            </div>
-
-            {/* Action Area */}
-            <div className="mt-4 flex flex-col gap-4">
-              <button 
-                type="submit"
-                className="relative overflow-hidden w-full bg-primary/10 border border-primary text-primary font-data-mono text-sm py-4 px-6 uppercase tracking-[0.15em] hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] hover:scale-[1.02] transition-all duration-300 group"
-              >
-                <span className="relative z-10 flex items-center justify-center gap-2">
-                  Initialize Authorization
-                  <span className="material-symbols-outlined text-[18px]">lock_open</span>
-                </span>
-                {/* CSS animated scanline inside the button */}
-                <div className="absolute top-0 left-0 w-full h-[20px] bg-gradient-to-b from-transparent via-primary/40 to-transparent animate-[scanline_3s_linear_infinite] pointer-events-none opacity-50"></div>
-              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleMfaSubmit} className="w-full flex flex-col gap-5 relative">
+              <div className="flex flex-col gap-1 text-center mb-2">
+                <h3 className="font-data-mono text-primary text-sm glow-cyan uppercase">Security Check Required</h3>
+                <p className="text-[10px] text-on-surface-variant font-label-caps tracking-widest mt-1">A verification code has been sent to your secure device.</p>
+              </div>
               
-              <div className="flex justify-between items-center px-1">
-                <button type="button" className="font-label-caps text-[9px] text-on-surface-variant hover:text-primary transition-colors uppercase tracking-tight">Request Credentials</button>
-                <button type="button" className="font-label-caps text-[9px] text-on-surface-variant hover:text-primary transition-colors uppercase tracking-tight">System Status</button>
+              <div className="flex flex-col gap-1">
+                <label className="font-label-caps text-[10px] text-primary opacity-70 uppercase tracking-wider ml-1 text-center">6-Digit OTP Token</label>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value)}
+                    placeholder="000000" 
+                    maxLength={6}
+                    className="w-full text-center tracking-[1em] bg-transparent border-0 border-b-2 border-primary py-2 px-1 font-data-mono text-xl text-primary placeholder:text-outline/30 focus:shadow-[0_4px_12px_-4px_rgba(0,240,255,0.3)] focus:outline-none transition-all duration-300"
+                  />
+                </div>
               </div>
-            </div>
-          </form>
+
+              <div className="mt-4 flex flex-col gap-4">
+                <button 
+                  type="submit"
+                  className="relative overflow-hidden w-full bg-primary/20 border border-primary text-primary font-data-mono text-sm py-4 px-6 uppercase tracking-[0.15em] hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] hover:scale-[1.02] transition-all duration-300 group"
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    Verify & Proceed
+                    <span className="material-symbols-outlined text-[18px]">verified_user</span>
+                  </span>
+                  <div className="absolute top-0 left-0 w-full h-[20px] bg-gradient-to-b from-transparent via-primary/40 to-transparent animate-[scanline_3s_linear_infinite] pointer-events-none opacity-50"></div>
+                </button>
+                <button type="button" onClick={() => setMfaStep(false)} className="font-label-caps text-[9px] text-on-surface-variant hover:text-error transition-colors uppercase tracking-tight text-center w-full mt-2">Cancel Authorization</button>
+              </div>
+            </form>
+          )}
 
           {/* Bottom HUD details */}
           <div className="w-full pt-4 mt-2 border-t border-primary/10 flex justify-between items-center opacity-50 font-data-mono text-[9px] text-primary tracking-widest">
