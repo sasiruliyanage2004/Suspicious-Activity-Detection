@@ -1,9 +1,12 @@
 import os
+from dotenv import load_dotenv
 import requests
 import cv2
 import threading
 import time
 from datetime import datetime
+
+load_dotenv()
 
 class TelegramNotifier:
     def __init__(self):
