@@ -44,15 +44,15 @@ class TelegramNotifier:
             
     def _send_welcome(self, chat_id):
         welcome_text = (
-            "🛡️ *Welcome to Aethra Vision Command Center* 🛡️\n\n"
+            "🛡️ <b>Welcome to Aethra Vision Command Center</b> 🛡️\n\n"
             "I am the central notification node for your AI Security System. "
             "I am online 24/7 to provide you with real-time updates directly from your surveillance feeds.\n\n"
-            "*Capabilities:*\n"
+            "<b>Capabilities:</b>\n"
             "⚠️ Real-time weapon detection alerts\n"
             "🥊 Violence and anomalous behavior tracking\n"
             "📸 Instant snapshot evidence delivery\n"
             "📍 Intrusion zone monitoring\n\n"
-            "System status: _Online and monitoring._"
+            "System status: <i>Online and monitoring.</i>"
         )
         
         try:
@@ -60,12 +60,14 @@ class TelegramNotifier:
                 url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
                 with open(self.welcome_image_path, "rb") as f:
                     files = {"photo": ("welcome.png", f, "image/png")}
-                    data = {"chat_id": chat_id, "caption": welcome_text, "parse_mode": "Markdown"}
-                    requests.post(url, data=data, files=files, timeout=10)
+                    data = {"chat_id": chat_id, "caption": welcome_text, "parse_mode": "HTML"}
+                    resp = requests.post(url, data=data, files=files, timeout=10)
+                    print(f"Telegram Photo Response: {resp.status_code} {resp.text}")
             else:
                 url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
-                data = {"chat_id": chat_id, "text": welcome_text, "parse_mode": "Markdown"}
-                requests.post(url, data=data, timeout=5)
+                data = {"chat_id": chat_id, "text": welcome_text, "parse_mode": "HTML"}
+                resp = requests.post(url, data=data, timeout=5)
+                print(f"Telegram Msg Response: {resp.status_code} {resp.text}")
         except Exception as e:
             print(f"Failed to send welcome message: {e}")
         
