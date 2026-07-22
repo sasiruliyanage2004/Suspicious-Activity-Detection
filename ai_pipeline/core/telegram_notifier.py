@@ -36,11 +36,26 @@ class TelegramNotifier:
                         chat_id = message.get("chat", {}).get("id")
                         
                         if text == "/start":
-                            self._send_welcome(chat_id)
+                            if str(chat_id) == str(self.chat_id):
+                                self._send_welcome(chat_id)
+                            else:
+                                self._send_access_denied(chat_id)
             except Exception as e:
                 # Silently pass on network errors during polling
                 pass
             time.sleep(2)
+            
+    def _send_access_denied(self, chat_id):
+        try:
+            url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+            data = {
+                "chat_id": chat_id, 
+                "text": "⛔ <b>Access Denied</b>\n\nYou are not an authorized user for Aethra Vision Command Center. Please contact your system administrator to link your Telegram account.", 
+                "parse_mode": "HTML"
+            }
+            requests.post(url, data=data, timeout=5)
+        except Exception:
+            pass
             
     def _send_welcome(self, chat_id):
         welcome_text = (
