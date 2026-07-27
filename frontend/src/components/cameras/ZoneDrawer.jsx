@@ -73,7 +73,7 @@ export default function ZoneDrawer({ cameraId, onClose }) {
       return (
           <button 
             onClick={() => setIsDrawing(true)} 
-            className="absolute bottom-4 right-4 bg-error/20 hover:bg-error/40 text-error border border-error/50 px-4 py-2 rounded-sm font-label-caps tracking-widest text-[10px] uppercase flex items-center gap-2 transition-colors z-30"
+            className="absolute bottom-4 left-4 bg-error/20 hover:bg-error/40 text-error border border-error/50 px-4 py-2 rounded-sm font-label-caps tracking-widest text-[10px] uppercase flex items-center gap-2 transition-colors z-30 shadow-[0_0_10px_rgba(255,82,92,0.2)]"
           >
               <span className="material-symbols-outlined text-[16px]">draw</span> DRAW INTRUSION ZONE
           </button>

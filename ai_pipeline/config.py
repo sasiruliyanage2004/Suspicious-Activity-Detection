@@ -11,6 +11,10 @@ class Settings:
     CAMERA_1_PORT = int(os.getenv("CAMERA_1_PORT", 80))
     CAMERA_1_USER = os.getenv("CAMERA_1_USER", "admin")
     CAMERA_1_PASS = os.getenv("CAMERA_1_PASS", "Hikvision321")
+    CAMERA_2_IP = os.getenv("CAMERA_2_IP", "192.168.1.2")
+    CAMERA_2_PORT = int(os.getenv("CAMERA_2_PORT", 80))
+    CAMERA_2_USER = os.getenv("CAMERA_2_USER", "admin")
+    CAMERA_2_PASS = os.getenv("CAMERA_2_PASS", "Hikvision321")
     BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
 
 settings = Settings()

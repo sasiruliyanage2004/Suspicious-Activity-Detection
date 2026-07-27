@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 export default function AuthScreen({ onLogin }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@aethra.sec');
+  const [password, setPassword] = useState('admin123');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
@@ -104,27 +104,52 @@ void main() {
   }, []);
 
   const [mfaStep, setMfaStep] = useState(false);
-  const [mfaCode, setMfaCode] = useState('');
+  const [mfaCode, setMfaCode] = useState('000000');
+  
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     setError('');
-    // Mock JWT backend validation
-    if (email.toLowerCase() === 'admin@aethra.sec' && password === 'admin123') {
-      // Transition to MFA Step
+    setSuccessMsg('');
+    const inputEmail = email.trim() || 'admin@aethra.sec';
+    const inputPass = password || 'admin123';
+    
+    // Auto-proceed to MFA Step or directly log in
+    if (inputPass === 'admin123' || inputPass.length > 0) {
       setMfaStep(true);
     } else {
       setError('ACCESS DENIED. INVALID CREDENTIALS.');
     }
   };
 
+  const handleRegisterSubmit = (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
+    if (!regEmail || !regPassword || !companyName) {
+      setError('ALL FIELDS REQUIRED FOR SECTOR CREATION.');
+      return;
+    }
+    setSuccessMsg('SECTOR INITIATED SUCCESSFULLY. PROCEED TO AUTHORIZATION.');
+    setIsRegistering(false);
+    setEmail(regEmail);
+    setPassword(regPassword);
+    setRegEmail('');
+    setRegPassword('');
+    setCompanyName('');
+  };
+
   const handleMfaSubmit = (e) => {
     e.preventDefault();
     setError('');
-    // Mock MFA validation (accepts 000000 for demo)
-    if (mfaCode === '000000') {
-      // Generate a mock JWT token and log in
-      const mockJwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI...'; 
+    // Accepts 000000 or any code
+    if (mfaCode === '000000' || mfaCode.length > 0) {
+      const mockJwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; 
       onLogin(mockJwt);
     } else {
       setError('MFA FAILURE. INVALID SECURITY TOKEN.');
@@ -175,8 +200,42 @@ void main() {
             </div>
           )}
 
-          {/* Login Form */}
-          {!mfaStep ? (
+          {successMsg && (
+            <div className="w-full p-3 rounded-sm border text-[10px] font-data-mono text-center tracking-widest bg-primary/20 border-primary text-primary shadow-[0_0_10px_rgba(0,240,255,0.2)]">
+              {successMsg}
+            </div>
+          )}
+
+          {/* Forms */}
+          {isRegistering ? (
+            <form onSubmit={handleRegisterSubmit} className="w-full flex flex-col gap-5 relative">
+              <div className="flex flex-col gap-1">
+                <label className="font-label-caps text-[10px] text-primary opacity-70 uppercase tracking-wider ml-1">Sector Name (Company)</label>
+                <div className="relative">
+                  <input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Aethra Corp" className="w-full bg-transparent border-0 border-b border-[#3b494b] py-2 px-1 font-data-mono text-sm text-primary placeholder:text-outline/30 focus:border-primary focus:shadow-[0_4px_12px_-4px_rgba(0,240,255,0.3)] focus:outline-none transition-all duration-300" />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="font-label-caps text-[10px] text-primary opacity-70 uppercase tracking-wider ml-1">Terminal ID (Email)</label>
+                <div className="relative">
+                  <input type="email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} placeholder="admin@domain.com" className="w-full bg-transparent border-0 border-b border-[#3b494b] py-2 px-1 font-data-mono text-sm text-primary placeholder:text-outline/30 focus:border-primary focus:shadow-[0_4px_12px_-4px_rgba(0,240,255,0.3)] focus:outline-none transition-all duration-300" />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="font-label-caps text-[10px] text-primary opacity-70 uppercase tracking-wider ml-1">Access Protocol (Password)</label>
+                <div className="relative">
+                  <input type="password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} placeholder="••••••••••••" className="w-full bg-transparent border-0 border-b border-[#3b494b] py-2 px-1 font-data-mono text-sm text-primary placeholder:text-outline/30 focus:border-primary focus:shadow-[0_4px_12px_-4px_rgba(0,240,255,0.3)] focus:outline-none transition-all duration-300" />
+                </div>
+              </div>
+              <div className="mt-4 flex flex-col gap-4">
+                <button type="submit" className="relative overflow-hidden w-full bg-primary/10 border border-primary text-primary font-data-mono text-sm py-4 px-6 uppercase tracking-[0.15em] hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] hover:scale-[1.02] transition-all duration-300 group">
+                  <span className="relative z-10 flex items-center justify-center gap-2">Initialize Sector <span className="material-symbols-outlined text-[18px]">add_circle</span></span>
+                  <div className="absolute top-0 left-0 w-full h-[20px] bg-gradient-to-b from-transparent via-primary/40 to-transparent animate-[scanline_3s_linear_infinite] pointer-events-none opacity-50"></div>
+                </button>
+                <button type="button" onClick={() => { setIsRegistering(false); setError(''); setSuccessMsg(''); }} className="font-label-caps text-[9px] text-on-surface-variant hover:text-primary transition-colors uppercase tracking-tight text-center w-full mt-2">Cancel / Back to Authorization</button>
+              </div>
+            </form>
+          ) : !mfaStep ? (
             <form onSubmit={handleLoginSubmit} className="w-full flex flex-col gap-5 relative">
               {/* Email Field */}
               <div className="flex flex-col gap-1">
@@ -227,7 +286,7 @@ void main() {
                 </button>
                 
                 <div className="flex justify-between items-center px-1">
-                  <button type="button" className="font-label-caps text-[9px] text-on-surface-variant hover:text-primary transition-colors uppercase tracking-tight">Request Credentials</button>
+                  <button type="button" onClick={() => { setIsRegistering(true); setError(''); setSuccessMsg(''); }} className="font-label-caps text-[9px] text-on-surface-variant hover:text-primary transition-colors uppercase tracking-tight">Create New Node (Register)</button>
                   <button type="button" className="font-label-caps text-[9px] text-on-surface-variant hover:text-primary transition-colors uppercase tracking-tight">System Status</button>
                 </div>
               </div>

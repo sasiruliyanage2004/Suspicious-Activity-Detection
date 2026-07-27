@@ -17,4 +17,6 @@ class Alert(Base):
     behavior_type = Column(String, index=True)
     confidence = Column(Float)
     details = Column(String)
+    clip_url = Column(String, default="")
+    snapshot_url = Column(String, default="")
     timestamp = Column(DateTime, default=datetime.utcnow)

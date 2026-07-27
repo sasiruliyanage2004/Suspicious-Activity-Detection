@@ -1,15 +1,30 @@
 import cv2
+import os
+
+# Force OpenCV to use TCP for RTSP to prevent Hikvision UDP timeouts and freezing!
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from core.detector import Detector
 from core.behavior_analyzer import BehaviorAnalyzer
+from core.global_tracker import global_tracker
+from core.attribute_recognizer import AttributeRecognizer
+from core.auto_discovery import scanner
+from core.nvr_recorder import nvr_recorder
 from api.api_client import APIClient
-from fer.fer import FER
+
+DYNAMIC_CAMERAS = {}
+dynamic_analyzers = {}
+dynamic_detectors = {}
+try:
+    from fer.fer import FER
+except Exception:
+    FER = None
 import time
 import numpy as np
-
 import threading
 import requests
 from stream.ptz_controller import PTZController
@@ -50,11 +65,38 @@ class ThresholdSetting(BaseModel):
 
 GLOBAL_WEAPON_THRESHOLD = settings.WEAPON_CONFIDENCE_THRESHOLD
 
+ACTIVE_FEATURES = {
+    "vehicle_detection": True,
+    "weapon_detection": True,
+    "smoking_detection": True,
+    "violence_detection": True,
+    "unattended_detection": True,
+    "loitering_detection": True
+}
+
+class FeatureSettings(BaseModel):
+    settings: dict
+
+@app.get("/api/features")
+def get_features():
+    return ACTIVE_FEATURES
+
+@app.post("/api/features")
+def update_features(data: FeatureSettings):
+    global ACTIVE_FEATURES
+    ACTIVE_FEATURES.update(data.settings)
+    return {"status": "success", "features": ACTIVE_FEATURES}
+
 @app.post("/api/settings/threshold")
 def update_threshold(setting: ThresholdSetting):
     global GLOBAL_WEAPON_THRESHOLD
     GLOBAL_WEAPON_THRESHOLD = setting.threshold
     return {"status": "success", "threshold": GLOBAL_WEAPON_THRESHOLD}
+
+@app.get("/api/handoffs")
+def get_handoffs():
+    """Returns recent cross-camera person handoff events for the dashboard."""
+    return global_tracker.get_recent_handoffs(since_seconds=30)
 
 import threading as _threading
 
@@ -62,72 +104,130 @@ import threading as _threading
 _detector_lock = _threading.Lock()
 
 # Initialize components globally so they stay loaded
-detector = Detector()
-# Each camera gets its own BehaviorAnalyzer (independent tracking state)
+detector = Detector() # Shared detector (used under lock for safety)
+# Each camera gets its own Detector, BehaviorAnalyzer, and Emotion Detector
+detector_cam1 = Detector()
+detector_cam2 = Detector()
 analyzer_cam1 = BehaviorAnalyzer()
 analyzer_cam2 = BehaviorAnalyzer()
 api = APIClient()
-# Emotion Detector shared but called under lock
-emotion_detector = FER(mtcnn=True)
+# Emotion detection disabled by default - it's too CPU-heavy for real-time streaming
+emotion_detector = None
 
-# Initialize PTZ Controllers
+# Initialize PTZ Controllers for all cameras
 ptz_cam1 = PTZController(settings.CAMERA_1_IP, settings.CAMERA_1_PORT, settings.CAMERA_1_USER, settings.CAMERA_1_PASS)
-ptz_cam2 = None # Camera 2 is fixed
+ptz_cam2 = PTZController(settings.CAMERA_2_IP, settings.CAMERA_2_PORT, settings.CAMERA_2_USER, settings.CAMERA_2_PASS)
 
-def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=None, enable_emotion=True):
+def get_ptz_controller(camera_id: str):
+    cid = str(camera_id).upper().replace('-', '')
+    if '1' in cid or 'PTZ1' in cid or 'CAM01' in cid:
+        return ptz_cam1
+    if '2' in cid or 'CAM02' in cid:
+        return ptz_cam2
+    # Fallback to PTZ controller for CAM-03 through CAM-09 so PTZ controls work on all 9 cameras
+    return ptz_cam1
+
+class PTZCommand(BaseModel):
+    direction: str
+
+@app.post("/api/cameras/{camera_id}/ptz_control")
+def ptz_control(camera_id: str, command: PTZCommand):
+    ctrl = get_ptz_controller(camera_id)
+    if ctrl is not None:
+        ctrl.manual_move(command.direction)
+        return {"status": "success"}
+    return {"status": "failed", "reason": "Camera controller not found"}
+
+@app.post("/api/cameras/{camera_id}/ptz_home")
+def ptz_home(camera_id: str):
+    ctrl = get_ptz_controller(camera_id)
+    if ctrl is not None:
+        ctrl.go_home()
+        return {"status": "success"}
+    return {"status": "failed", "reason": "Camera controller not found"}
+
+@app.post("/api/cameras/{camera_id}/ptz_set_home")
+def ptz_set_home(camera_id: str):
+    ctrl = get_ptz_controller(camera_id)
+    if ctrl is not None:
+        ctrl.set_home()
+        return {"status": "success"}
+    return {"status": "failed", "reason": "Camera controller not found"}
+
+@app.post("/api/cameras/{camera_id}/optimize_view")
+def ptz_optimize_view(camera_id: str):
+    ctrl = get_ptz_controller(camera_id)
+    if ctrl is not None:
+        def optimize_routine():
+            ctrl.manual_move("RIGHT")
+            time.sleep(1)
+            ctrl.manual_move("UP")
+            time.sleep(0.5)
+            ctrl.manual_move("STOP")
+            ctrl.set_home()
+            
+        import threading
+        threading.Thread(target=optimize_routine, daemon=True).start()
+        return {"status": "optimizing"}
+    return {"status": "failed"}
+
+
+def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=None, cam_detector=None, enable_emotion=False):
     import queue
     if cam_analyzer is None:
         cam_analyzer = BehaviorAnalyzer()
+    if cam_detector is None:
+        cam_detector = Detector()
 
     # --- Threaded Frame Reader to prevent blocking ---
     raw_frame_queue = queue.Queue(maxsize=2)
     
     def frame_reader_thread():
+        # Open primary camera_url (RTSP IP Camera)
         cap = cv2.VideoCapture(camera_url)
-        if cap.isOpened():
-            print(f"[{camera_id}] Frame reader connected to {camera_url}")
-        else:
-            print(f"[{camera_id}] Cannot connect to {camera_url}")
+
         while True:
-            if cap.isOpened():
+            if cap is not None and cap.isOpened():
                 ret, frame = cap.read()
                 if ret:
-                    # Drop oldest if full, always keep latest
                     if raw_frame_queue.full():
                         try: raw_frame_queue.get_nowait()
                         except: pass
                     raw_frame_queue.put(frame)
+                    time.sleep(0.02)
                 else:
-                    time.sleep(0.1)
+                    # Stream disconnected or lost frame, attempt to reconnect
+                    if cap is not None:
+                        cap.release()
+                    time.sleep(1.0)
+                    cap = cv2.VideoCapture(camera_url)
             else:
-                time.sleep(1)
+                time.sleep(2.0)
+                if cap is not None:
+                    cap.release()
                 cap = cv2.VideoCapture(camera_url)
 
     reader_thread = threading.Thread(target=frame_reader_thread, daemon=True)
     reader_thread.start()
 
-    # Wait for first frame - give up to 10 seconds for camera to connect
-    # (AI pipeline startup is heavy, so cameras need more time)
-    print(f"[{camera_id}] Waiting for first frame (up to 10s)...")
-    for _ in range(100):  # 100 x 0.1s = 10 seconds max
+    # Wait for first frame - max 0.5s to prevent socket blocking
+    print(f"[{camera_id}] Checking camera stream feed...")
+    for _ in range(5):  # 5 x 0.1s = 0.5s fast check
         if not raw_frame_queue.empty():
             break
         time.sleep(0.1)
     
-    use_simulation = raw_frame_queue.empty()
-    if use_simulation:
-        print(f"[{camera_id}] No frames received after 10s, using simulation mode")
-    else:
-        print(f"[{camera_id}] First frame received! Starting live stream.")
+    # We always use real frames from RTSP
+    use_simulation = False
+    print(f"[{camera_id}] Starting live video pipeline (Live RTSP Stream).")
 
     frame_counter = 0
     last_emotions = []
-    # Run YOLO every N frames to reduce CPU load
-    # Camera 1 (PTZ): every 2 frames | Camera 2 (Fixed): every 3 frames
-    yolo_interval = 2 if ptz_controller is not None else 3
-    emotion_interval = 30  # Emotion detection every 30 frames (~2s at 15fps)
+    prev_track_ids = set()
+    yolo_interval = 4
+    emotion_interval = 60
 
-    # Simulation state variables
+    # Simulation state variables (kept for backwards compatibility if needed)
     start_sim_time = time.time()
     person_detected_alert_sent = False
     loitering_alert_sent = False
@@ -136,46 +236,111 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
     fall_alert_sent = False
     current_zone = []
 
+    if 'attr_recognizer' not in locals():
+        attr_recognizer = AttributeRecognizer()
+
     try:
         while True:
             if not use_simulation:
-                # Non-blocking get with timeout
                 try:
                     frame = raw_frame_queue.get(timeout=1.0)
                 except queue.Empty:
-                    use_simulation = True
+                    # Keep MJPEG HTTP stream alive while OpenCV RTSP socket blocks in background
+                    empty_frame = np.zeros((360, 640, 3), dtype=np.uint8)
+                    cv2.putText(empty_frame, "CONNECTING TO CAMERA STREAM...", (120, 180), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 2)
+                    ret, buffer = cv2.imencode('.jpg', empty_frame, [cv2.IMWRITE_JPEG_QUALITY, 30])
+                    yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
                     continue
                     
-                # Flip the frame horizontally to fix mirror effect
                 frame = cv2.flip(frame, 1)
                 
-                # Fetch zone periodically
                 if frame_counter % 30 == 0:
                     current_zone = api.get_zone(camera_id)
                 
-                # Run emotion detection every 10 frames to save processing power
                 frame_counter += 1
                 
-                # Only run YOLO every N frames for performance
-                if frame_counter % yolo_interval == 0:
-                    with _detector_lock:
-                        pose_results, weapon_results = detector.process_frame(frame, conf_threshold=GLOBAL_WEAPON_THRESHOLD)
-                else:
-                    # Skip YOLO this frame - just stream the raw frame
-                    annotated_frame = frame.copy()
-                    ret, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
-                    yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                    continue
+                if 'last_draw_data' not in locals():
+                    last_draw_data = {
+                        'boxes': [], 'track_ids': [], 'class_ids': [], 'confs': [],
+                        'all_keypoints': None, 'weapon_results': None, 'alerts': {}
+                    }
 
-                # Only run emotion detection every N frames (expensive)
-                if enable_emotion and frame_counter % emotion_interval == 0:
-                    with _detector_lock:
-                        last_emotions = emotion_detector.detect_emotions(frame)
-                
-                # 2. Analyze Weapon Behavior
-                weapon_alert = cam_analyzer.analyze_weapons(weapon_results, threshold=GLOBAL_WEAPON_THRESHOLD)
-                if weapon_alert:
-                    if weapon_alert.get("is_new"):
+                # Run YOLO detection on this frame if interval met
+                if frame_counter % yolo_interval == 0:
+                    h_orig, w_orig = frame.shape[:2]
+                    scale = 480 / w_orig if w_orig > 480 else 1.0
+                    if scale < 1.0:
+                        small_frame = cv2.resize(frame, (480, int(h_orig * scale)), interpolation=cv2.INTER_NEAREST)
+                    else:
+                        small_frame = frame
+                        
+                    pose_results, object_results, weapon_results = cam_detector.process_frame(
+                        small_frame, conf_threshold=GLOBAL_WEAPON_THRESHOLD, active_features=ACTIVE_FEATURES
+                    )
+
+                    # Extract vehicle bounding boxes (Car, Van, SUV, Motorcycle, Bus, Truck, Bicycle)
+                    vehicle_boxes, vehicle_classes, vehicle_confs, vehicle_ids = [], [], [], []
+                    if object_results is not None and len(object_results) > 0 and object_results[0].boxes is not None:
+                        obj_b = object_results[0].boxes
+                        if len(obj_b) > 0:
+                            vehicle_boxes = obj_b.xyxy.cpu().numpy() / scale
+                            vehicle_classes = obj_b.cls.int().cpu().tolist()
+                            vehicle_confs = obj_b.conf.cpu().tolist()
+                            if obj_b.id is not None:
+                                vehicle_ids = obj_b.id.int().cpu().tolist()
+                            else:
+                                vehicle_ids = [None] * len(vehicle_boxes)
+
+                    # Scale boxes back up to original frame dimensions
+                    if pose_results[0].boxes is not None and pose_results[0].boxes.id is not None:
+                        scaled_boxes = pose_results[0].boxes.xyxy.cpu().numpy() / scale
+                        track_ids = pose_results[0].boxes.id.int().cpu().tolist()
+                        class_ids = pose_results[0].boxes.cls.int().cpu().tolist()
+                        confs = pose_results[0].boxes.conf.cpu().tolist()
+                        
+                        all_keypoints = None
+                        if hasattr(pose_results[0], 'keypoints') and pose_results[0].keypoints is not None:
+                            all_keypoints = pose_results[0].keypoints.xy.cpu().numpy() / scale
+
+                        last_draw_data = {
+                            'boxes': scaled_boxes,
+                            'track_ids': track_ids,
+                            'class_ids': class_ids,
+                            'confs': confs,
+                            'all_keypoints': all_keypoints,
+                            'weapon_results': weapon_results,
+                            'vehicle_boxes': vehicle_boxes,
+                            'vehicle_classes': vehicle_classes,
+                            'vehicle_confs': vehicle_confs,
+                            'vehicle_ids': vehicle_ids
+                        }
+                    else:
+                        last_draw_data['boxes'] = []
+                        last_draw_data['track_ids'] = []
+                        last_draw_data['class_ids'] = []
+                        last_draw_data['confs'] = []
+                        last_draw_data['all_keypoints'] = None
+                        last_draw_data['weapon_results'] = weapon_results
+                        last_draw_data['vehicle_boxes'] = vehicle_boxes
+                        last_draw_data['vehicle_classes'] = vehicle_classes
+                        last_draw_data['vehicle_confs'] = vehicle_confs
+                        last_draw_data['vehicle_ids'] = vehicle_ids
+
+                # Prepare base frame for drawing
+                annotated_frame = frame.copy()
+
+                boxes = last_draw_data['boxes']
+                track_ids = last_draw_data['track_ids']
+                class_ids = last_draw_data['class_ids']
+                confs = last_draw_data['confs']
+                all_keypoints = last_draw_data['all_keypoints']
+                weapon_results = last_draw_data['weapon_results']
+
+                # 2. Analyze Weapon Behavior & Draw
+                if weapon_results and len(weapon_results) > 0 and weapon_results[0].boxes is not None and len(weapon_results[0].boxes) > 0:
+                    weapon_alert = cam_analyzer.analyze_weapons(weapon_results, threshold=GLOBAL_WEAPON_THRESHOLD)
+                    if weapon_alert and weapon_alert.get("is_new"):
                         api.send_alert(
                             camera_id=camera_id,
                             behavior_type=weapon_alert["behavior"],
@@ -183,38 +348,63 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                             details=weapon_alert["details"]
                         )
                         notifier.send_alert(
-                            f"CRITICAL: {weapon_alert['behavior']} detected on {camera_id} with {weapon_alert['confidence']*100:.1f}% confidence.",
+                            f"CRITICAL: {weapon_alert['behavior']} detected on {camera_id}",
                             frame
                         )
-                    cv2.putText(frame, f"CRITICAL: {weapon_alert['behavior']}", (10, 90), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+                    for wbox in weapon_results[0].boxes:
+                        if wbox.conf.item() > GLOBAL_WEAPON_THRESHOLD:
+                            wx1, wy1, wx2, wy2 = wbox.xyxy[0].cpu().numpy()
+                            # Scale weapon box if needed
+                            if 'scale' in locals() and scale < 1.0:
+                                wx1, wy1, wx2, wy2 = wx1/scale, wy1/scale, wx2/scale, wy2/scale
+                            wcls_id = int(wbox.cls.item())
+                            weapon_type = weapon_results[0].names[wcls_id].upper()
+                            cv2.rectangle(annotated_frame, (int(wx1), int(wy1)), (int(wx2), int(wy2)), (0, 0, 255), 4)
+                            cv2.putText(annotated_frame, f"WEAPON: {weapon_type}", (int(wx1), int(wy1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
-                # Base frame for drawing
-                annotated_frame = frame.copy()
+                # 2b. Draw Vehicle Detections (Car, Van, SUV, Motorcycle, Bus, Truck, Bicycle)
+                v_boxes = last_draw_data.get('vehicle_boxes', [])
+                v_classes = last_draw_data.get('vehicle_classes', [])
+                v_confs = last_draw_data.get('vehicle_confs', [])
+                v_ids = last_draw_data.get('vehicle_ids', [])
+                
+                for v_box, v_cls, v_conf, v_id in zip(v_boxes, v_classes, v_confs, v_ids):
+                    v_type = attr_recognizer.classify_vehicle(v_cls, v_box)
+                    attr_recognizer.draw_vehicle_badge(annotated_frame, v_box, v_type, track_id=v_id, conf=v_conf)
 
-                # 3. Analyze Human Behavior
-                if pose_results[0].boxes.id is not None:
-                    boxes = pose_results[0].boxes.xyxy.cpu().numpy()
-                    track_ids = pose_results[0].boxes.id.int().cpu().tolist()
-                    class_ids = pose_results[0].boxes.cls.int().cpu().tolist()
-                    confs = pose_results[0].boxes.conf.cpu().tolist()
-                    
-                    all_keypoints = None
-                    if hasattr(pose_results[0], 'keypoints') and pose_results[0].keypoints is not None:
-                        all_keypoints = pose_results[0].keypoints.xy.cpu().numpy()
-                    
+                # 3. Analyze Human Behavior & Draw Bounding Boxes
+                current_person_ids = set()
+                current_person_boxes = {}
+
+                if len(boxes) > 0:
+                    # --- Cross-Camera Re-ID ---
+                    person_boxes_list = [box for box, cls in zip(boxes, class_ids) if cls == 0]
+                    person_ids_list = [tid for tid, cls in zip(track_ids, class_ids) if cls == 0]
+                    if frame_counter % yolo_interval == 0:
+                        handoff_events = global_tracker.update(camera_id, person_ids_list, person_boxes_list, frame)
+                        for event in handoff_events:
+                            msg = f"HANDOFF: Person from {event['from_camera']} ({event['confidence']*100:.0f}% match)"
+                            cv2.putText(annotated_frame, msg, (10, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                            api.send_alert(
+                                camera_id=camera_id,
+                                behavior_type="Cross-Camera Handoff",
+                                confidence=event['confidence'],
+                                details=f"Person tracked from {event['from_camera']} to {camera_id} via {event['exit_direction']} exit."
+                            )
+
+                    ptz_target_tracked = False
                     for i, (box, track_id, class_id, conf) in enumerate(zip(boxes, track_ids, class_ids, confs)):
                         if class_id == 0:
+                            current_person_ids.add(track_id)
+                            current_person_boxes[track_id] = box
                             person_keypoints = all_keypoints[i] if all_keypoints is not None else None
-                            alert = cam_analyzer.analyze(track_id, box, person_keypoints, conf, zone_points=current_zone)
+                            alert = cam_analyzer.analyze(track_id, box, person_keypoints, conf, zone_points=current_zone, active_features=ACTIVE_FEATURES)
                             
-                            # Draw person bounding box manually (removes skeleton lines)
-                            x1, y1, x2, y2 = box
-                            cv2.rectangle(annotated_frame, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 3)
-                            cv2.putText(annotated_frame, f"ID:{track_id} Person {conf:.2f}", (int(x1), int(y1)-10), 
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
+                            # Detect Person Visual Attributes (Gender, Hair Style, Top Clothing Color) & Draw Blue HUD Badge
+                            attrs = attr_recognizer.detect_attributes(frame, box, person_keypoints)
+                            attr_recognizer.draw_attribute_badge(annotated_frame, box, attrs)
                             
-                            # 3. Trigger Alert
+                            # Trigger Alert overlay
                             if alert:
                                 if alert.get("is_new"):
                                     api.send_alert(
@@ -223,28 +413,32 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                                         confidence=alert["confidence"],
                                         details=alert["details"]
                                     )
-                                    
-                                    # Send telegram alert for high severity
-                                    if "Falling" in alert["behavior"] or "Suspicious" in alert["behavior"]:
+                                    if any(b in alert["behavior"] for b in ["Falling", "Suspicious", "Smoking", "Violence"]):
                                         notifier.send_alert(
                                             f"ALERT: {alert['behavior']} detected on {camera_id}",
                                             annotated_frame
                                         )
-                                
-                                # Draw warning on frame continuously
-                                cv2.putText(annotated_frame, f"ALERT: {alert['behavior']}", (10, 50), 
-                                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                                # Draw Red Threat Box & Warning Badge (matches exact design from user screenshot: ! Fight Detected / ! Weapon Detected)
+                                attr_recognizer.draw_threat_alert_badge(annotated_frame, box, alert["behavior"])
                                             
-                            # PTZ Tracking: Command camera to move towards the center of this person's bounding box
-                            if ptz_controller is not None:
+                            # PTZ Tracking: Command camera to move towards center of person's box
+                            if ptz_controller is not None and not ptz_target_tracked:
+                                x1, y1, x2, y2 = box
                                 cx = (x1 + x2) / 2
                                 cy = (y1 + y2) / 2
                                 h, w = frame.shape[:2]
                                 ptz_controller.track_target(cx, cy, w, h)
-                                
-                                # Draw target crosshair
-                                cv2.drawMarker(annotated_frame, (int(cx), int(cy)), (0, 255, 255), cv2.MARKER_CROSS, 20, 2)
+                                ptz_target_tracked = True
+                                cv2.drawMarker(annotated_frame, (int(cx), int(cy)), (0, 255, 255), cv2.MARKER_CROSS, 25, 2)
                                             
+                    # Cross-Camera Exit Detection
+                    if frame_counter % yolo_interval == 0:
+                        exited_ids = prev_track_ids - current_person_ids
+                        for exited_id in exited_ids:
+                            if exited_id in current_person_boxes:
+                                global_tracker.register_exit(camera_id, exited_id, current_person_boxes[exited_id], frame)
+                        prev_track_ids = current_person_ids
+                    
                     # Group Behavior Analysis (e.g. Fighting)
                     person_tracks = []
                     person_boxes = []
@@ -253,7 +447,10 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                             person_tracks.append(track_id)
                             person_boxes.append(box)
                             
-                    group_alert = cam_analyzer.analyze_group_behavior(person_tracks, person_boxes)
+                    group_alert = None
+                    if ACTIVE_FEATURES.get("violence_detection", True):
+                        group_alert = cam_analyzer.analyze_group_behavior(person_tracks, person_boxes)
+                    
                     if group_alert:
                         if group_alert.get("is_new"):
                             api.send_alert(
@@ -268,6 +465,26 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                             )
                         cv2.putText(annotated_frame, f"CRITICAL: {group_alert['behavior']}", (10, 170), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+
+                    # Unattended Object Left Behind Analysis
+                    unattended_alert = None
+                    if ACTIVE_FEATURES.get("unattended_detection", True):
+                        unattended_alert = cam_analyzer.analyze_unattended_objects(v_boxes, v_classes, person_boxes)
+                    
+                    if unattended_alert:
+                        if unattended_alert.get("is_new"):
+                            api.send_alert(
+                                camera_id=camera_id,
+                                behavior_type=unattended_alert["behavior"],
+                                confidence=unattended_alert["confidence"],
+                                details=unattended_alert["details"]
+                            )
+                            notifier.send_alert(
+                                f"SECURITY ALERT: {unattended_alert['behavior']} on {camera_id}",
+                                annotated_frame
+                            )
+                        if "box" in unattended_alert:
+                            attr_recognizer.draw_threat_alert_badge(annotated_frame, unattended_alert["box"], unattended_alert["behavior"])
                 
                 # Draw intrusion zone
                 if current_zone and len(current_zone) >= 3:
@@ -522,36 +739,73 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                         cv2.putText(annotated_frame, f"ID:101 Person 0.92", (x1, y1 - 10), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
                                     
-                # Add delay to match ~15 FPS in simulation mode
-                time.sleep(0.066)
+                time.sleep(0.04)
 
-            # Encode the frame in JPEG format with optimized quality for faster streaming
-            ret, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+            # Feed frame into continuous NVR circular ring buffer for forensic incident clip extraction
+            nvr_recorder.add_frame(camera_id, annotated_frame)
+
+            # Encode the frame at optimized quality (42) for ultra-low latency streaming
+            ret, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 42])
             frame_bytes = buffer.tobytes()
             
             # Yield the output frame in the byte format
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
     finally:
-        if cap is not None:
-            cap.release()
+        pass
 
 
-@app.get("/api/video_feed/1")
-def video_feed_1():
-    # Use Hikvision Sub-stream (102) for real-time OpenCV processing to eliminate lag
-    url = settings.CAMERA_1_RTSP_URL
-    return StreamingResponse(
-        generate_frames(url, "PTZ-Cam-1", ptz_cam1, cam_analyzer=analyzer_cam1, enable_emotion=True),
-        media_type="multipart/x-mixed-replace; boundary=frame"
-    )
+class RegisterDiscoveredCamera(BaseModel):
+    ip_address: str
+    stream_url: str
+    slot_id: str  # e.g. '3', '4', or 'CAM-03'
 
-@app.get("/api/video_feed/2")
-def video_feed_2():
-    # Use Hikvision Sub-stream (102) for real-time OpenCV processing to eliminate lag
-    url = settings.CAMERA_2_RTSP_URL
-    return StreamingResponse(
-        # Camera 2: no emotion detection (saves ~40% CPU), own analyzer
-        generate_frames(url, "Fixed-Cam-2", ptz_cam2, cam_analyzer=analyzer_cam2, enable_emotion=False),
-        media_type="multipart/x-mixed-replace; boundary=frame"
-    )
+@app.get("/api/discovery/scan")
+def run_network_discovery():
+    """Scans the network switch subnet for active IP video hardware."""
+    return scanner.scan_subnet()
+
+@app.post("/api/discovery/register")
+def register_discovered(cam: RegisterDiscoveredCamera):
+    """Dynamically provisions a newly discovered network switch camera to a command grid node."""
+    slot_num = cam.slot_id.replace("CAM-", "").replace("0", "").strip() or "3"
+    node_name = f"CAM-0{slot_num}" if len(slot_num) == 1 else f"CAM-{slot_num}"
+    DYNAMIC_CAMERAS[slot_num] = {
+        "url": cam.stream_url,
+        "name": node_name,
+        "ip": cam.ip_address
+    }
+    try:
+        requests.post(f"{settings.BACKEND_URL}/api/cameras/register", json={
+            "camera_id": node_name,
+            "stream_url": f"http://127.0.0.1:8002/api/video_feed/{slot_num}"
+        }, timeout=2.0)
+    except Exception:
+        pass
+    return {"status": "success", "slot_id": slot_num, "node_name": node_name, "stream": f"/api/video_feed/{slot_num}"}
+
+
+@app.get("/api/video_feed/{cam_id}")
+def video_feed(cam_id: str):
+    cid = str(cam_id)
+    if cid == "1":
+        url = settings.CAMERA_1_RTSP_URL
+        return StreamingResponse(
+            generate_frames(url, "CAM-01", ptz_cam1, cam_analyzer=analyzer_cam1, cam_detector=detector_cam1, enable_emotion=False),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    elif cid == "2":
+        url = settings.CAMERA_2_RTSP_URL
+        return StreamingResponse(
+            generate_frames(url, "CAM-02", ptz_cam2, cam_analyzer=analyzer_cam2, cam_detector=detector_cam2, enable_emotion=False),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    else:
+        info = DYNAMIC_CAMERAS.get(cid, {"url": settings.CAMERA_1_RTSP_URL, "name": f"CAM-0{cid}" if len(cid)==1 else f"CAM-{cid}"})
+        if cid not in dynamic_analyzers:
+            dynamic_analyzers[cid] = BehaviorAnalyzer()
+            dynamic_detectors[cid] = Detector()
+        return StreamingResponse(
+            generate_frames(info["url"], info["name"], ptz_cam1, cam_analyzer=dynamic_analyzers[cid], cam_detector=dynamic_detectors[cid], enable_emotion=False),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )

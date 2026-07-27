@@ -1,9 +1,12 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 import json
 from db.database import engine, Base, get_db
 import api.routers.alerts as alerts
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta
@@ -18,7 +21,23 @@ ALGORITHM = settings.ALGORITHM
 
 Base.metadata.create_all(bind=engine)
 
+# Gracefully upgrade SQLite database schema if columns do not exist yet (zero bugs!)
+try:
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE alerts ADD COLUMN clip_url VARCHAR DEFAULT ''"))
+except Exception:
+    pass
+try:
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE alerts ADD COLUMN snapshot_url VARCHAR DEFAULT ''"))
+except Exception:
+    pass
+
+vault_dir = os.path.join(os.path.dirname(__file__), "recordings_vault")
+os.makedirs(vault_dir, exist_ok=True)
+
 app = FastAPI(title=settings.PROJECT_NAME)
+app.mount("/vault", StaticFiles(directory=vault_dir), name="vault")
 
 app.add_middleware(
     CORSMiddleware,

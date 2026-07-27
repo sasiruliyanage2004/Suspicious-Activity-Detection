@@ -17,6 +17,8 @@ class AlertCreate(BaseModel):
     behavior_type: str
     confidence: float
     details: str = ""
+    clip_url: str = ""
+    snapshot_url: str = ""
 
 class AlertResponse(AlertCreate):
     id: int
@@ -39,6 +41,8 @@ def create_alert(alert: AlertCreate, background_tasks: BackgroundTasks, db: Sess
         "behavior_type": db_alert.behavior_type,
         "confidence": db_alert.confidence,
         "details": db_alert.details,
+        "clip_url": db_alert.clip_url or "",
+        "snapshot_url": db_alert.snapshot_url or "",
         "timestamp": db_alert.timestamp.isoformat()
     }
     background_tasks.add_task(manager.broadcast, json.dumps(alert_dict))

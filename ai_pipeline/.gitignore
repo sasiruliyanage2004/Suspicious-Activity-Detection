@@ -1,6 +1,5 @@
 # ========================================================
 # 1. VIDEO RECORDINGS, NVR ARCHIVES & SNAPSHOTS
-# (Never push CCTV feeds, video clips, or captured evidence)
 # ========================================================
 archive/
 nvr_archive/
@@ -31,7 +30,6 @@ temp_clips/
 
 # ========================================================
 # 2. AI / DEEP LEARNING MODELS & WEIGHTS
-# (Large files that exceed GitHub file limits > 50MB/100MB)
 # ========================================================
 *.pt
 *.pth
@@ -54,10 +52,10 @@ checkpoints/
 pretrained/
 tensorboard_logs/
 artifacts/
+yolo*.pt
 
 # ========================================================
 # 3. SECRETS, LICENSE KEYS, TOKENS & PRIVATE CONFIGS
-# (Critical for security: API keys, bot tokens, PII)
 # ========================================================
 *.license.json
 licenses_registry.json
@@ -88,7 +86,6 @@ settings.local.py
 
 # ========================================================
 # 4. DATABASES & LOCAL STORAGE STATE
-# (Never commit client data or local database mutations)
 # ========================================================
 *.db
 *.sqlite
@@ -96,10 +93,6 @@ settings.local.py
 *.db-journal
 *.dump
 *.sql
-sql_app.db
-mongo_data/
-postgres_data/
-redis_data/
 
 # ========================================================
 # 5. PYTHON & VIRTUAL ENVIRONMENTS
@@ -128,28 +121,7 @@ wheels/
 *.egg
 
 # ========================================================
-# 6. FRONTEND, NODE.JS & BUILD OUTPUTS
-# ========================================================
-node_modules/
-.npm/
-.pnpm-store/
-.eslintcache
-.stylelintcache
-dist/
-build/
-out/
-.next/
-.nuxt/
-.cache/
-*.tsbuildinfo
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# ========================================================
-# 7. LOGS, DEBUG & TEMPORARY FILES
+# 6. LOGS, DEBUG & TEMPORARY FILES
 # ========================================================
 *.log
 logs/
@@ -164,7 +136,7 @@ error.log
 YOLO_*.log
 
 # ========================================================
-# 8. OS, IDE & EDITOR FILES
+# 7. OS, IDE & EDITOR FILES
 # ========================================================
 .vscode/
 .idea/
