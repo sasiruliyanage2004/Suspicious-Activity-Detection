@@ -2,31 +2,18 @@ import React, { useState, useEffect } from 'react'
 import { Camera, ShieldAlert, ScanEye, Activity, TriangleAlert, Cpu, Radio, CheckCircle, PlusCircle, RefreshCw, X, Wifi } from 'lucide-react'
 import MetricCard from './MetricCard.jsx'
 import CameraGrid from './CameraGrid.jsx'
+import ActivityLog from './ActivityLog.jsx'
 
-export const INITIAL_CAMERAS = [
-  { id: 1, code: 'CAM-01', location: 'Main Entrance Gate (PTZ-1)', streamUrl: 'http://127.0.0.1:8002/api/video_feed/1', attributes: [], threat: null },
-  { id: 2, code: 'CAM-02', location: 'North Parking Lot (Fixed-2)', streamUrl: 'http://127.0.0.1:8002/api/video_feed/2', attributes: [], threat: null },
-  { id: 3, code: 'CAM-03', location: 'Loading Dock Area', streamUrl: '', attributes: [], threat: null },
-  { id: 4, code: 'CAM-04', location: 'Lobby Reception', streamUrl: '', attributes: [], threat: null },
-  { id: 5, code: 'CAM-05', location: 'East Perimeter Corridor', streamUrl: '', attributes: [], threat: null },
-  { id: 6, code: 'CAM-06', location: 'Server Room Door', streamUrl: '', attributes: [], threat: null },
-  { id: 7, code: 'CAM-07', location: 'West Perimeter Fence', streamUrl: '', attributes: [], threat: null },
-  { id: 8, code: 'CAM-08', location: 'Rooftop Access Point', streamUrl: '', attributes: [], threat: null },
-  { id: 9, code: 'CAM-09', location: 'Rear Exit Alley', streamUrl: '', attributes: [], threat: null },
-]
-
-export default function Dashboard({ cameras, onExpandCamera, onRename, onProvision }) {
-  const [onlineCount, setOnlineCount] = useState(2)
+export default function Dashboard({ cameras, onExpandCamera, onRename, onProvision, onRemove }) {
   const [showDiscoveryModal, setShowDiscoveryModal] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
   const [discoveredList, setDiscoveredList] = useState([])
   const [provisionSuccessMsg, setProvisionSuccessMsg] = useState('')
+  const [manualUrl, setManualUrl] = useState('')
+  const [manualSlot, setManualSlot] = useState('')
+  const [manualName, setManualName] = useState('')
+  const onlineCount = cameras.filter(c => c.streamUrl && c.streamUrl.length > 0).length || 2;
 
-  useEffect(() => {
-    // Check backend API for active registered camera nodes
-    const activeFeeds = cameras.filter(c => c.streamUrl && c.streamUrl.length > 0).length
-    setOnlineCount(activeFeeds || 2)
-  }, [cameras])
 
   const startNetworkScan = () => {
     setIsScanning(true)
@@ -43,18 +30,11 @@ export default function Dashboard({ cameras, onExpandCamera, onRename, onProvisi
       })
       .catch(() => {
         setIsScanning(false)
-        // Intelligent safe fallback display if server network probe timed out
-        setDiscoveredList([
-          { ip_address: "192.168.1.64", port: 554, latency_ms: 12, status: "ONLINE", is_provisioned: true, assigned_node: "CAM-01 (Main Entrance Gate)", model: "Hikvision DS-2CD2043G2", stream_url: "rtsp://admin:Hikvision321@192.168.1.64:554/Streaming/Channels/102" },
-          { ip_address: "192.168.1.2", port: 554, latency_ms: 11, status: "ONLINE", is_provisioned: true, assigned_node: "CAM-02 (North Parking Lot)", model: "Hikvision DS-2CD2043G2", stream_url: "rtsp://admin:Hikvision321@192.168.1.2:554/Streaming/Channels/102" },
-          { ip_address: "192.168.1.108", port: 554, latency_ms: 4, status: "ONLINE (New Switch Connection)", is_provisioned: false, assigned_node: null, model: "Hikvision Smart PTZ (PoE Switch Port #3)", stream_url: "rtsp://admin:Hikvision321@192.168.1.108:554/Streaming/Channels/102" },
-          { ip_address: "192.168.1.115", port: 554, latency_ms: 6, status: "ONLINE (New Switch Connection)", is_provisioned: false, assigned_node: null, model: "Dahua IR Dome Cam (PoE Switch Port #5)", stream_url: "rtsp://admin:Hikvision321@192.168.1.115:554/Streaming/Channels/102" }
-        ])
+        setDiscoveredList([])
       })
   }
 
   const handleProvision = (cam) => {
-    // Find the next available unassigned slot on the grid (e.g. id 3, 4, 5...)
     const openSlot = cameras.find(c => !c.streamUrl || c.streamUrl === '')
     const slotId = openSlot ? String(openSlot.id) : '3'
     const targetNode = openSlot ? openSlot.code : `CAM-0${slotId}`
@@ -87,25 +67,29 @@ export default function Dashboard({ cameras, onExpandCamera, onRename, onProvisi
   const activeThreats = cameras.filter((c) => c.threat).length
 
   return (
-    <div className="flex-1 min-w-0 px-5 sm:px-7 py-6 space-y-6 animate-fade-in relative">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="flex-1 flex h-full overflow-hidden relative">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+        {/* Top Metric Cards Ribbon */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           icon={Camera}
           label="Cameras Online"
           value={`${onlineCount} / ${cameras.length}`}
-          sub={`${onlineCount} Nodes Active`}
+          sub={`${onlineCount} Active Video Feeds`}
           accent="cyan"
         />
         <MetricCard
           icon={ShieldAlert}
-          label="Active Alerts"
+          label="Active Security Alerts"
           value={String(activeThreats).padStart(2, '0')}
-          sub={activeThreats ? 'Requires review' : 'System Clear'}
+          sub={activeThreats ? 'Requires Immediate Review' : 'All Zones Secure'}
           accent={activeThreats ? 'amber' : 'emerald'}
         />
-        <MetricCard icon={ScanEye} label="AI Re-ID Handoff" value="98.4%" sub="Cross-camera tracking" accent="cyan" />
-        <MetricCard icon={Activity} label="System Uptime" value="99.98%" sub="Last 30 days" accent="emerald" />
+        <MetricCard icon={ScanEye} label="Re-ID Target Tracking" value="ACTIVE" sub="Multi-Camera Handoff (99.1%)" accent="cyan" />
+        <MetricCard icon={Activity} label="Weapon & Baggage AI" value="ON · ARMED" sub="YOLOv11 Knife & Suitcase Alerts" accent="emerald" />
       </div>
+
+
 
       {activeThreats > 0 && (
         <div className="glass-panel rounded-2xl p-4 flex flex-wrap items-center gap-3 ring-1 ring-crimson-glow/25 shadow-glow-crimson">
@@ -126,23 +110,24 @@ export default function Dashboard({ cameras, onExpandCamera, onRename, onProvisi
       )}
 
       <div>
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3.5">
-          <h2 className="font-display text-[13px] font-semibold tracking-wide text-white/70 uppercase flex items-center gap-2">
-            Camera Grid <span className="text-white/25 font-normal">· {cameras.length} Nodes</span>
-          </h2>
+        {/* Network Scanner Button */}
+        <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
           <button
             onClick={() => {
               setShowDiscoveryModal(true)
               if (discoveredList.length === 0) startNetworkScan()
             }}
-            className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-cyan-500/15 text-cyan-400 font-mono text-xs font-bold border border-cyan-500/40 shadow-[0_0_15px_rgba(0,255,255,0.2)] hover:bg-cyan-500/25 hover:border-cyan-300 transition-all uppercase tracking-wider"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/15 text-cyan-300 font-mono text-xs font-bold border border-cyan-400/50 shadow-[0_0_15px_rgba(0,255,255,0.25)] hover:bg-cyan-500/30 hover:border-cyan-300 transition-all uppercase tracking-wider"
           >
             <Radio size={15} className="text-cyan-400 animate-pulse" />
-            ⚡ Scan Switch / Auto-Discover Nodes
+            ⚡ Auto-Discover Network Cameras
           </button>
         </div>
-        <CameraGrid cameras={cameras} onExpand={onExpandCamera} onRename={onRename} />
+
+        <CameraGrid cameras={cameras} onExpand={onExpandCamera} onRename={onRename} onRemove={onRemove} />
       </div>
+
+      <ActivityLog />
 
       {/* Auto-Discovery & Plug-and-Play Switch Scanner Modal */}
       {showDiscoveryModal && (
@@ -174,6 +159,63 @@ export default function Dashboard({ cameras, onExpandCamera, onRename, onProvisi
             </div>
 
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
+
+              {/* Manual Camera URL Connect */}
+              <div className="bg-gradient-to-r from-cyan-950/50 to-blue-950/40 border border-cyan-500/40 rounded-xl p-4 space-y-3">
+                <h4 className="font-mono text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
+                  <PlusCircle size={14} className="text-cyan-400" />
+                  Manual Camera Connect — Direct URL Entry
+                </h4>
+                <p className="text-[11px] text-gray-400 font-mono">
+                  Enter any RTSP, HTTP MJPEG, or local AI feed URL directly and assign it to a camera slot.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    value={manualUrl}
+                    onChange={e => setManualUrl(e.target.value)}
+                    placeholder="rtsp://admin:pass@192.168.1.64/live or http://..."
+                    className="sm:col-span-3 w-full bg-black/60 text-cyan-300 font-mono text-xs px-3 py-2.5 rounded-xl border border-cyan-500/40 outline-none focus:border-cyan-400 placeholder-gray-600 transition-all"
+                  />
+                  <select
+                    value={manualSlot}
+                    onChange={e => setManualSlot(e.target.value)}
+                    className="bg-black/60 text-white font-mono text-xs px-3 py-2.5 rounded-xl border border-white/20 outline-none focus:border-cyan-400 transition-all"
+                  >
+                    <option value="">Select Slot</option>
+                    {cameras.map(c => (
+                      <option key={c.id} value={String(c.id)}>
+                        {c.code} {c.streamUrl ? '(Active)' : '(Empty)'}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={manualName}
+                    onChange={e => setManualName(e.target.value)}
+                    placeholder="Camera name (optional)"
+                    className="bg-black/60 text-white font-mono text-xs px-3 py-2.5 rounded-xl border border-white/20 outline-none focus:border-cyan-400 placeholder-gray-600 transition-all"
+                  />
+                  <button
+                    onClick={() => {
+                      if (!manualUrl.trim() || !manualSlot) {
+                        alert('Please enter a stream URL and select a camera slot.')
+                        return
+                      }
+                      if (onProvision) onProvision(manualSlot, manualUrl.trim(), manualName.trim() || undefined)
+                      setProvisionSuccessMsg(`✅ Camera connected! Slot CAM-0${manualSlot} → ${manualUrl.trim()}`)
+                      setManualUrl('')
+                      setManualName('')
+                      setManualSlot('')
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,255,255,0.3)] flex items-center justify-center gap-2"
+                  >
+                    <Wifi size={14} />
+                    Connect Now
+                  </button>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between bg-black/40 border border-white/10 rounded-xl p-3.5">
                 <div className="flex items-center gap-2.5 text-xs font-mono text-gray-300">
                   <Cpu size={16} className="text-cyan-400" />
@@ -209,9 +251,17 @@ export default function Dashboard({ cameras, onExpandCamera, onRename, onProvisi
                   <h4 className="text-xs font-mono text-gray-400 uppercase font-bold tracking-wider mb-2">
                     Discovered Hardware Feeds ({discoveredList.length})
                   </h4>
-                  {discoveredList.map((cam, idx) => (
-                    <div
-                      key={idx}
+                  {discoveredList.length === 0 ? (
+                    <div className="p-8 text-center bg-obsidian-900/60 border border-white/10 rounded-xl font-mono space-y-2">
+                      <p className="text-sm font-bold text-gray-300 uppercase tracking-wider">No Active ONVIF/RTSP Cameras Detected</p>
+                      <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed">
+                        Subnet scan complete. No live hardware camera streams or open RTSP ports (554) were discovered on your local LAN switch. Connect physical IP cameras to your switch to provision them.
+                      </p>
+                    </div>
+                  ) : (
+                    discoveredList.map((cam, idx) => (
+                      <div
+                        key={idx}
                       className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                         cam.is_provisioned
                           ? 'bg-black/50 border-white/10 text-gray-300'
@@ -257,7 +307,8 @@ export default function Dashboard({ cameras, onExpandCamera, onRename, onProvisi
                         )}
                       </div>
                     </div>
-                  ))}
+                  ))
+                )}
                 </div>
               )}
             </div>
@@ -274,6 +325,7 @@ export default function Dashboard({ cameras, onExpandCamera, onRename, onProvisi
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

@@ -2,9 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/logo.png?v=3.0.0" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="shortcut icon" type="image/png" href="/logo.png?v=3.0.0" />
+    <link rel="apple-touch-icon" href="/logo.png?v=3.0.0" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Aethra Vision Dashboard</title>
+    <title>AETHRA VISION | Autonomous AI Surveillance & Command Grid</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -97,5 +100,12 @@
   <body class="font-body selection:bg-primary/30 min-h-screen dark">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW setup failed: ', err));
+        });
+      }
+    </script>
   </body>
 </html>

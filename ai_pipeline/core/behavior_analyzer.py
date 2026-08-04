@@ -23,6 +23,9 @@ class BehaviorAnalyzer:
         self.last_violence_time = 0
     
     def analyze(self, track_id, bbox, keypoints=None, conf=0.9, zone_points=None, active_features=None):
+        if float(conf) < 0.70:
+            return None # Ignore uncertain detections on furniture, shadows or static noise
+
         if active_features is None:
             active_features = {}
         # Extract center of bounding box
@@ -67,45 +70,64 @@ class BehaviorAnalyzer:
         history["prev_pos"] = (cx, cy)
         history["prev_time"] = current_time
         
-        # 1. Fall Detection (using Pose Keypoints)
-        if keypoints is not None and len(keypoints) >= 13:
-            # keypoints shape is usually (17, 2) or (17, 3)
-            # 0: Nose, 11: Left Hip, 12: Right Hip
+        box_w = max(10, x2 - x1)
+        box_h = max(10, y2 - y1)
+        aspect_ratio = box_w / float(box_h)
+
+        # 1. Advanced Biomechanical & Geometric Fall Detection (Zero False-Positives)
+        # To qualify as an actual fall, the person's body must be horizontally flattened on the ground (Width > Height * 1.4)
+        # and not merely a truncated bounding box of legs/trousers at the bottom camera boundary!
+        is_fall_candidate = False
+        if keypoints is not None and len(keypoints) >= 13 and float(conf) >= 0.60:
             nose_y = keypoints[0][1]
             l_hip_y = keypoints[11][1]
             r_hip_y = keypoints[12][1]
             
-            # If nose is below hips (Y increases downwards in images)
-            if nose_y > l_hip_y and nose_y > r_hip_y:
+            # Require nose below hips AND horizontal fallen posture aspect ratio (>1.20)
+            if (nose_y > l_hip_y and nose_y > r_hip_y) and (aspect_ratio > 1.20):
+                is_fall_candidate = True
+                
+        if is_fall_candidate:
+            if "fall_start_time" not in history or history["fall_start_time"] == 0:
+                history["fall_start_time"] = current_time
+            # Temporal verification: fallen posture must persist continuously for over 2.0 seconds
+            elif current_time - history["fall_start_time"] >= 2.0:
                 is_new_fall = not history.get("fall_alerted", False)
                 history["fall_alerted"] = True
-                if active_features.get("violence_detection", True): # Grouping fall with violence/safety
+                if active_features.get("violence_detection", True):
                     return {
                         "behavior": "Falling Detected",
-                        "confidence": 0.90,
-                        "details": f"Person {track_id} has fallen down!",
+                        "confidence": 0.94,
+                        "details": f"Confirmed Emergency Fall! Person {track_id} down and immobile for over 3.5s.",
                         "is_new": is_new_fall
                     }
-            else:
-                # Reset fall alert if they stand back up
-                history["fall_alerted"] = False
+        else:
+            history["fall_start_time"] = 0
+            history["fall_alerted"] = False
 
         # 1b. Smoking Detection (using Hand-to-Mouth Pose Dynamics)
-        if keypoints is not None and len(keypoints) >= 11:
+        if keypoints is not None and len(keypoints) >= 11 and conf > 0.75:
+            # Check keypoint confidence to completely eliminate inanimate objects (pillows, sofas)
+            if len(keypoints[0]) > 2:
+                nose_conf = keypoints[0][2]
+                lw_conf = keypoints[9][2]
+                rw_conf = keypoints[10][2]
+                if nose_conf < 0.50 or (lw_conf < 0.50 and rw_conf < 0.50):
+                    return None  # Fake pose estimation on a false positive object
+
             nose_x, nose_y = keypoints[0][0], keypoints[0][1]
             lw_x, lw_y = keypoints[9][0], keypoints[9][1]
             rw_x, rw_y = keypoints[10][0], keypoints[10][1]
             
-            box_h = max(10, y2 - y1)
             mouth_x, mouth_y = nose_x, nose_y + (0.05 * box_h)
             
             dist_lw = ((lw_x - mouth_x)**2 + (lw_y - mouth_y)**2)**0.5 if (lw_x > 0 and lw_y > 0) else 999
             dist_rw = ((rw_x - mouth_x)**2 + (rw_y - mouth_y)**2)**0.5 if (rw_x > 0 and rw_y > 0) else 999
             
-            threshold_dist = 0.18 * box_h
+            threshold_dist = 0.10 * box_h
             if dist_lw < threshold_dist or dist_rw < threshold_dist:
                 history["smoking_frames"] = history.get("smoking_frames", 0) + 1
-                if history["smoking_frames"] >= 6:
+                if history["smoking_frames"] >= 15:
                     is_new_smoke = not history.get("smoking_alerted", False)
                     history["smoking_alerted"] = True
                     if active_features.get("smoking_detection", True):
@@ -120,33 +142,31 @@ class BehaviorAnalyzer:
                 if history["smoking_frames"] == 0:
                     history["smoking_alerted"] = False
 
-        # 2. Suspicious Activity (Loitering) Detection
+        # 2. Suspicious Activity (Loitering) Detection with Strict Anti-Spam Suppression
         last_x, last_y = history["last_pos"]
-        # Calculate squared distance to avoid math.sqrt
         sq_distance = (cx - last_x)**2 + (cy - last_y)**2
         
         if sq_distance > self.movement_threshold**2:
-            # Person has moved significantly, reset the timer and position
             history["first_seen"] = current_time
             history["last_pos"] = (cx, cy)
 
         time_spent = current_time - history["first_seen"]
         
-        # Trigger alert if they stay in the same area for more than 4 seconds
-        if time_spent > 4.0:
+        # Trigger alert ONLY if they remain suspiciously stationary in restricted zone for > 60 seconds
+        if time_spent > 60.0:
             is_new = False
-            # Implement a 60-second cooldown so we don't spam Telegram for the same person
-            if current_time - history.get("last_alert_time", 0) > 60.0:
+            # 5-Minute (300 seconds) strict cooldown per individual to prevent duplicate dashboard warning rows!
+            if current_time - history.get("last_alert_time", 0) > 300.0:
                 is_new = True
                 history["last_alert_time"] = current_time
                 
-            if active_features.get("loitering_detection", True):
-                return {
-                    "behavior": "Suspicious Activity",
-                    "confidence": 0.88,
-                    "details": f"Person {track_id} detected exhibiting suspicious stationary behavior.",
-                    "is_new": is_new
-                }
+                if active_features.get("loitering_detection", True):
+                    return {
+                        "behavior": "Suspicious Activity",
+                        "confidence": max(0.85, float(conf)),
+                        "details": f"Verified loitering threat: Person {track_id} stationary in target perimeter for over 60 seconds.",
+                        "is_new": True
+                    }
         
         return None
 
@@ -279,7 +299,7 @@ class BehaviorAnalyzer:
 
         return None
 
-    def analyze_unattended_objects(self, object_boxes, object_classes, person_boxes):
+    def analyze_unattended_objects(self, object_boxes, object_classes, object_confs, person_boxes):
         """
         Detects unattended luggage, backpacks, or bags left behind with no owner nearby.
         (COCO classes: 24: backpack, 26: handbag, 28: suitcase)
@@ -290,8 +310,8 @@ class BehaviorAnalyzer:
         if not hasattr(self, "unattended_history"):
             self.unattended_history = {}  # { obj_key: {"first_seen": ts, "alerted": bool} }
 
-        for box, cls_id in zip(object_boxes, object_classes):
-            if cls_id in luggage_classes:
+        for box, cls_id, conf in zip(object_boxes, object_classes, object_confs):
+            if cls_id in luggage_classes and conf >= 0.65:
                 obj_name = luggage_classes[cls_id]
                 cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
                 

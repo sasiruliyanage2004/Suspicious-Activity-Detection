@@ -2,13 +2,13 @@
 echo Starting CCTV AI Security System...
 
 echo Starting Backend API...
-start cmd /k "cd backend && ..\.venv\Scripts\python -m uvicorn main:app --reload"
+start "Backend" cmd /k "cd /d "%~dp0backend" && "..\.venv\Scripts\python.exe" -m uvicorn main:app --reload"
 
 echo Starting AI Camera Pipeline...
-start cmd /k "cd ai_pipeline && ..\.venv\Scripts\python -m uvicorn main:app --port 8002"
+start "AI Pipeline" cmd /k "cd /d "%~dp0ai_pipeline" && "..\.venv\Scripts\python.exe" -m uvicorn main:app --port 8002"
 
 echo Starting React Dashboard...
-start cmd /k "cd frontend && npm run dev"
+start "Frontend" cmd /k "cd /d "%~dp0frontend" && npm run dev"
 
 echo All services started!
 echo Please wait a few seconds for the camera to initialize...

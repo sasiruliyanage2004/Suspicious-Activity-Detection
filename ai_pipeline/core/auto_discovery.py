@@ -1,6 +1,7 @@
 import socket
 import concurrent.futures
 import time
+from config import settings
 
 class NetworkCameraScanner:
     def __init__(self, default_subnet="192.168.1", rtsp_port=554, timeout=0.25):
@@ -30,15 +31,8 @@ class NetworkCameraScanner:
         target_subnet = subnet if subnet else self.default_subnet
         discovered_cameras = []
         
-        # We scan IPs concurrently using a thread pool for maximum speed (~1.5s total duration)
+        # We scan IPs concurrently using a thread pool for maximum speed
         ips_to_scan = [f"{target_subnet}.{i}" for i in range(1, 255)]
-        
-        # For efficiency during live operations, prioritize known and common IP allocations
-        priority_ips = ["192.168.1.64", "192.168.1.2", "192.168.1.108", "192.168.1.115", "192.168.1.150", "192.168.1.200"]
-        for p_ip in reversed(priority_ips):
-            if p_ip in ips_to_scan:
-                ips_to_scan.remove(p_ip)
-                ips_to_scan.insert(0, p_ip)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=60) as executor:
             future_to_ip = {executor.submit(self._check_port, ip, self.rtsp_port): ip for ip in ips_to_scan}
@@ -47,46 +41,25 @@ class NetworkCameraScanner:
                 ip = future_to_ip[future]
                 try:
                     is_open, latency = future.result()
-                    if is_open or ip in ["192.168.1.64", "192.168.1.2"]:
+                    # Only append to discovered list if a genuine physical camera / RTSP service answered
+                    if is_open:
                         known = ip in self.known_mappings
-                        node_name = self.known_mappings.get(ip, "Unassigned Switch Node")
+                        node_name = self.known_mappings.get(ip, None)
                         
+                        user = settings.CAMERA_1_USER
+                        password = settings.CAMERA_1_PASS
                         discovered_cameras.append({
                             "ip_address": ip,
                             "port": self.rtsp_port,
-                            "latency_ms": latency if latency > 0 else 14,
-                            "status": "ONLINE",
+                            "latency_ms": latency if latency > 0 else 2,
+                            "status": "ONLINE (Hardware Detected)",
                             "is_provisioned": known,
-                            "assigned_node": node_name if known else None,
-                            "model": "Hikvision DS-2CD2043G2" if "64" in ip or "2" in ip else "Dahua PoE Switch Cam",
-                            "stream_url": f"rtsp://admin:Hikvision321@{ip}:554/Streaming/Channels/102"
+                            "assigned_node": node_name,
+                            "model": "ONVIF / RTSP Network Camera",
+                            "stream_url": f"rtsp://{user}:{password}@{ip}:554/Streaming/Channels/102"
                         })
                 except Exception:
                     continue
-
-        # Surface ready-to-provision PoE switch nodes for instant Plug & Play verification
-        has_unprovisioned = any(not cam["is_provisioned"] for cam in discovered_cameras)
-        if not has_unprovisioned:
-            discovered_cameras.append({
-                "ip_address": f"{target_subnet}.108",
-                "port": self.rtsp_port,
-                "latency_ms": 4,
-                "status": "ONLINE (New Switch Connection)",
-                "is_provisioned": False,
-                "assigned_node": None,
-                "model": "Hikvision Smart PTZ (PoE Switch Port #3)",
-                "stream_url": f"rtsp://admin:Hikvision321@{target_subnet}.108:554/Streaming/Channels/102"
-            })
-            discovered_cameras.append({
-                "ip_address": f"{target_subnet}.115",
-                "port": self.rtsp_port,
-                "latency_ms": 6,
-                "status": "ONLINE (New Switch Connection)",
-                "is_provisioned": False,
-                "assigned_node": None,
-                "model": "Dahua IR Dome Cam (PoE Switch Port #5)",
-                "stream_url": f"rtsp://admin:Hikvision321@{target_subnet}.115:554/Streaming/Channels/102"
-            })
 
         discovered_cameras.sort(key=lambda x: int(x["ip_address"].split(".")[-1]))
         return {

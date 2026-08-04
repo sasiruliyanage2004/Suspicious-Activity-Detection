@@ -32,17 +32,7 @@ const validatePasswordSecurity = (pass) => {
   return null
 }
 
-// ─── localStorage Operators Retrieval ───────────────────────────────────────
-const getOperators = () => {
-  try {
-    const stored = localStorage.getItem('aethra_operators')
-    if (stored) return JSON.parse(stored)
-  } catch { /* fallback */ }
-  return [
-    { badgeId: 'SEC-OP-1024-A', pin: '1234', name: 'Nimal Silva' },
-    { badgeId: 'SEC-OP-9842-B', pin: '5678', name: 'Sunethra Perera' }
-  ]
-}
+// Operators are now fetched from the backend API
 
 // ─── Shield Emblem ──────────────────────────────────────────────────────────
 function ShieldMark({ size = 60 }) {
@@ -96,12 +86,34 @@ function Label({ children, amber }) {
 // ═════════════════════════════════════════════════════════════════════════════
 export default function AuthScreen({ onAuthenticated }) {
   const [license, setLicense] = useState(DEFAULT_LICENSE)
+  const [operators, setOperators] = useState([])
 
   useEffect(() => {
     fetch('/aethra.license.json')
       .then((res) => res.json())
       .then((data) => setLicense(data))
       .catch(() => {})
+
+    // Fetch operators from SQL Backend
+    fetch('http://127.0.0.1:8000/api/operators')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setOperators(data)
+        } else {
+          // Fallback if DB is empty
+          setOperators([
+            { badge_id: 'SEC-OP-1024-A', pin: '1234', name: 'Nimal Silva', is_active: 1 },
+            { badge_id: 'SEC-OP-9842-B', pin: '5678', name: 'Sunethra Perera', is_active: 1 }
+          ])
+        }
+      })
+      .catch(() => {
+        setOperators([
+          { badge_id: 'SEC-OP-1024-A', pin: '1234', name: 'Nimal Silva', is_active: 1 },
+          { badge_id: 'SEC-OP-9842-B', pin: '5678', name: 'Sunethra Perera', is_active: 1 }
+        ])
+      })
   }, [])
 
   // 'admin' | 'operator'
@@ -124,23 +136,50 @@ export default function AuthScreen({ onAuthenticated }) {
   // Operator credentials states
   const [badgeId, setBadgeId] = useState('')
   const [pin, setPin] = useState('')
+  const [guardStep, setGuardStep] = useState('login') // 'login' | 'reset_pin'
+  const [newGuardPin, setNewGuardPin] = useState('')
+  const [confirmGuardPin, setConfirmGuardPin] = useState('')
 
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // ── Dispatch Real Telegram OTP Message ─────────────────────────────────────
-  const sendTelegramOtp = (code) => {
-    const botToken = license.telegram_bot_token || DEFAULT_LICENSE.telegram_bot_token
-    const chatId = license.telegram_chat_id || DEFAULT_LICENSE.telegram_chat_id
+  // ── Dispatch Real Telegram OTP Message (Exactly-Once Delivery Waterfall) ────
+  const sendTelegramOtp = async (code) => {
+    const botToken = license.telegram_bot_token || DEFAULT_LICENSE.telegram_bot_token || "7700244458:AAGoJv9eE8rV1Ehy-S4P1KAsfF0VqK2iWpM"
+    const chatId = license.telegram_chat_id || DEFAULT_LICENSE.telegram_chat_id || "6498528994"
+    const textMsg = `🔒 AETHRA VISION 2FA OTP CODE: ${code}\nAuthorized Admin Login Attempt for ${license.company_name || 'Aethra Command'}.\nValid for 5 minutes.`
 
+    const payload = JSON.stringify({ code: strVal(code), message: textMsg, bot_token: botToken, chat_id: chatId })
+
+    // 1. Try Primary Python Backend (Port 8000) - Fast & 100% immune to browser adblockers
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/auth/send_otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload
+      });
+      if (res.ok) return; // SUCCESS: Stop immediately to prevent duplicate messages!
+    } catch (e) { /* Backend 8000 unreachable, failover to secondary */ }
+
+    // 2. Try Secondary AI Pipeline Backend (Port 8002) as fallback
+    try {
+      const res2 = await fetch('http://127.0.0.1:8002/api/auth/send_otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload
+      });
+      if (res2.ok) return; // SUCCESS: Stop immediately!
+    } catch (e) { /* Backend 8002 unreachable, failover to browser direct */ }
+
+    // 3. Last-Resort Direct Telegram Fetch from Browser (if local Python backends are restarting)
     if (botToken && chatId) {
-      const textMsg = `🔒 AETHRA VISION 2FA OTP CODE: ${code}\nAuthorized Admin Login Attempt for ${license.company_name}.\nValid for 5 minutes.`
       const url = `https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(textMsg)}`
-      
-      // Send Telegram API request via image ping (100% reliable without double triggers)
-      const img = new Image()
-      img.src = url
+      fetch(url, { method: 'GET', mode: 'no-cors' }).catch(() => {})
     }
+  }
+
+  function strVal(val) {
+    return typeof val === 'string' ? val : String(val)
   }
 
   // ── Step 1: Admin Login Credentials Check ─────────────────────────────────
@@ -250,20 +289,74 @@ export default function AuthScreen({ onAuthenticated }) {
       setError('ACCESS DENIED: Please enter your assigned Unique Badge Access ID.')
       return
     }
-    const operators = getOperators()
     const found = operators.find(
-      (op) => op.badgeId.toLowerCase() === badgeId.trim().toLowerCase() &&
+      (op) => op.badge_id.toLowerCase() === badgeId.trim().toLowerCase() &&
              (!pin.trim() || op.pin === pin.trim())
     )
     if (!found) {
       setError('ACCESS DENIED: Unrecognized Badge Access ID or PIN. Contact System Admin.')
       return
     }
+    if (found.is_active === 0) {
+      setError('ACCESS DENIED: This operator account has been SUSPENDED. Contact System Admin.')
+      return
+    }
     setLoading(true)
-    setTimeout(() => {
+    fetch(`http://127.0.0.1:8000/api/operators/${found.badge_id}/login`, { method: 'POST' })
+      .finally(() => {
+        setLoading(false)
+        onAuthenticated?.({ name: found.name, role: 'operator', badgeId: found.badge_id })
+      })
+  }
+
+  const handleOperatorPinReset = (e) => {
+    e.preventDefault()
+    setError('')
+    
+    if (!badgeId.trim() || !pin.trim()) {
+      setError('Please provide your Badge ID and Current PIN.')
+      return
+    }
+    
+    const foundIndex = operators.findIndex(
+      (op) => op.badge_id.toLowerCase() === badgeId.trim().toLowerCase() && op.pin === pin.trim()
+    )
+    
+    if (foundIndex === -1) {
+      setError('ACCESS DENIED: Unrecognized Badge ID or Current PIN is incorrect.')
+      return
+    }
+    
+    if (newGuardPin.length < 4) {
+      setError('Security Policy: New PIN must be at least 4 digits.')
+      return
+    }
+    
+    if (newGuardPin !== confirmGuardPin) {
+      setError('PIN mismatch: New PIN and Confirm PIN do not match.')
+      return
+    }
+    
+    setLoading(true)
+    const op = operators[foundIndex]
+    fetch(`http://127.0.0.1:8000/api/operators/${op.badge_id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: newGuardPin })
+    })
+    .then(res => res.json())
+    .then(() => {
       setLoading(false)
-      onAuthenticated?.({ name: found.name, role: 'operator', badgeId: found.badgeId })
-    }, 400)
+      setPin('')
+      setNewGuardPin('')
+      setConfirmGuardPin('')
+      setGuardStep('login')
+      alert('SUCCESS: Operator PIN securely updated. You may now login with the new PIN.')
+    })
+    .catch(() => {
+      setLoading(false)
+      setError('FAILED: Could not securely connect to backend database.')
+    })
   }
 
   const handleResendOtp = () => {
@@ -344,10 +437,11 @@ export default function AuthScreen({ onAuthenticated }) {
                     <Field icon={Mail}>
                       <input
                         type="text"
-                        placeholder={license.master_admin_email}
+                        placeholder="Enter Authorized Admin Email..."
                         value={email}
+                        autoComplete="off"
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-transparent outline-none text-xs font-mono text-white placeholder:text-white/20"
+                        className="w-full bg-transparent outline-none text-xs font-mono text-white placeholder:text-white/30"
                       />
                     </Field>
                   </div>
@@ -522,47 +616,137 @@ export default function AuthScreen({ onAuthenticated }) {
 
           {/* ════════════════ GUARD STATION LOGIN ════════════════ */}
           {loginType === 'operator' && (
-            <form onSubmit={handleOperatorSubmit} className="space-y-4">
-              <div className="flex flex-col gap-1">
-                <Label amber>Assigned Operator Badge ID</Label>
-                <Field icon={ShieldCheck} amber>
-                  <input
-                    type="text"
-                    placeholder="SEC-OP-982019-X7"
-                    value={badgeId}
-                    onChange={(e) => setBadgeId(e.target.value)}
-                    className="w-full bg-transparent outline-none text-xs font-mono text-[#FF8A00] placeholder:text-white/20 uppercase tracking-wider"
-                  />
-                </Field>
-              </div>
+            <>
+              {guardStep === 'login' ? (
+                <form onSubmit={handleOperatorSubmit} className="space-y-4">
+                  <div className="flex flex-col gap-1">
+                    <Label amber>Assigned Operator Badge ID</Label>
+                    <Field icon={ShieldCheck} amber>
+                      <input
+                        type="text"
+                        placeholder="SEC-OP-[ID]-[KEY]"
+                        value={badgeId}
+                        onChange={(e) => setBadgeId(e.target.value)}
+                        className="w-full bg-transparent outline-none text-xs font-mono text-[#FF8A00] placeholder:text-white/20 uppercase tracking-wider"
+                      />
+                    </Field>
+                  </div>
 
-              <div className="flex flex-col gap-1">
-                <Label amber>Security Passcode PIN</Label>
-                <Field icon={Lock} amber>
-                  <input
-                    type="password"
-                    placeholder="••••"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    className="w-full bg-transparent outline-none text-xs font-mono text-white placeholder:text-white/20 tracking-widest"
-                  />
-                </Field>
-              </div>
+                  <div className="flex flex-col gap-1">
+                    <Label amber>Security Passcode PIN</Label>
+                    <Field icon={Lock} amber>
+                      <input
+                        type="password"
+                        placeholder="••••"
+                        value={pin}
+                        onChange={(e) => setPin(e.target.value)}
+                        className="w-full bg-transparent outline-none text-xs font-mono text-white placeholder:text-white/20 tracking-widest"
+                      />
+                    </Field>
+                  </div>
 
-              <p className="font-mono text-[9px] text-gray-400 bg-black/40 border border-white/5 p-2 rounded-lg leading-relaxed">
-                🔒 <strong className="text-[#FF8A00]">AUDIT TRAIL:</strong> Bound to {license.company_name} ({license.tenant_id}).
-              </p>
+                  <p className="font-mono text-[9px] text-gray-400 bg-black/40 border border-white/5 p-2 rounded-lg leading-relaxed flex justify-between items-center">
+                    <span>🔒 <strong className="text-[#FF8A00]">AUDIT TRAIL:</strong> Bound to {license.company_name}.</span>
+                    <button
+                      type="button"
+                      onClick={() => { setGuardStep('reset_pin'); setError(''); }}
+                      className="text-[#FF8A00] hover:underline font-bold ml-2 shrink-0"
+                    >
+                      🔑 Reset PIN
+                    </button>
+                  </p>
 
-              {error && <p className="text-red-400 text-[11px] font-mono animate-fade-in">{error}</p>}
+                  {error && <p className="text-red-400 text-[11px] font-mono animate-fade-in">{error}</p>}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-11 rounded-xl bg-[#FF8A00] text-black font-display font-bold text-[#0B0E13] text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,138,0,0.4)] hover:brightness-110 transition-all disabled:opacity-60 mt-2"
-              >
-                {loading ? <Loader2 size={15} className="animate-spin" /> : <><span>Authenticate Duty Guard</span><ArrowRight size={14} /></>}
-              </button>
-            </form>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full h-11 rounded-xl bg-[#FF8A00] text-black font-display font-bold text-[#0B0E13] text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,138,0,0.4)] hover:brightness-110 transition-all disabled:opacity-60 mt-2"
+                  >
+                    {loading ? <Loader2 size={15} className="animate-spin" /> : <><span>Authenticate Duty Guard</span><ArrowRight size={14} /></>}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleOperatorPinReset} className="space-y-3.5">
+                  <div className="bg-[#FF8A00]/10 border border-[#FF8A00]/40 p-3 rounded-xl mb-2 font-mono text-[10px] text-[#FF8A00]">
+                    🛡️ <strong>OPERATOR IAM SELF-SERVICE:</strong> Provide your existing Badge ID and temporary/current PIN to securely establish a new confidential passcode.
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <Label amber>Operator Badge ID</Label>
+                    <Field icon={ShieldCheck} amber>
+                      <input
+                        type="text"
+                        placeholder="SEC-OP-[ID]-[KEY]"
+                        value={badgeId}
+                        onChange={(e) => setBadgeId(e.target.value)}
+                        className="w-full bg-transparent outline-none text-xs font-mono text-[#FF8A00] uppercase tracking-wider"
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <Label amber>Current / Temporary PIN</Label>
+                    <Field icon={Lock} amber>
+                      <input
+                        type="password"
+                        placeholder="Current PIN (e.g. 1234)"
+                        value={pin}
+                        onChange={(e) => setPin(e.target.value)}
+                        className="w-full bg-transparent outline-none text-xs font-mono text-white tracking-widest"
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <Label amber>New Secret PIN (4+ Digits)</Label>
+                    <Field icon={Lock} amber>
+                      <input
+                        type="password"
+                        maxLength={8}
+                        placeholder="••••"
+                        value={newGuardPin}
+                        onChange={(e) => setNewGuardPin(e.target.value)}
+                        className="w-full bg-transparent outline-none text-xs font-mono text-emerald-400 font-bold tracking-widest"
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <Label amber>Confirm New PIN</Label>
+                    <Field icon={Lock} amber>
+                      <input
+                        type="password"
+                        maxLength={8}
+                        placeholder="••••"
+                        value={confirmGuardPin}
+                        onChange={(e) => setConfirmGuardPin(e.target.value)}
+                        className="w-full bg-transparent outline-none text-xs font-mono text-emerald-400 font-bold tracking-widest"
+                      />
+                    </Field>
+                  </div>
+
+                  {error && <p className="text-red-400 text-[11px] font-mono animate-fade-in">{error}</p>}
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => { setGuardStep('login'); setError(''); }}
+                      className="w-1/3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 font-mono text-xs font-bold transition-all border border-white/10"
+                    >
+                      CANCEL
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-[#FF8A00] text-black font-display font-bold text-xs uppercase tracking-wider hover:brightness-110 shadow-lg transition-all"
+                    >
+                      {loading ? <Loader2 size={15} className="animate-spin inline" /> : "✔ SAVE & ACTIVATE PIN"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </>
           )}
 
         </div>

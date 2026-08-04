@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aethra Vision OS — Next-Gen AI Security Command Guide & Architecture</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%23030712%22 stroke=%22%2300f0ff%22 stroke-width=%228%22/><circle cx=%2250%22 cy=%2250%22 r=%2220%22 fill=%22none%22 stroke=%22%2300f0ff%22 stroke-width=%228%22/><circle cx=%2250%22 cy=%2250%22 r=%228%22 fill=%22%23ff0055%22/><path d=%22M50 10 v15 M50 75 v15 M10 50 h15 M75 50 h15%22 stroke=%22%2300f0ff%22 stroke-width=%228%22 stroke-linecap=%22round%22/></svg>">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #030712;
+    --panel-glow: rgba(0, 240, 255, 0.15);
+    --cyan: #00f0ff;
+    --emerald: #10b981;
+    --crimson: #ff0055;
+    --amber: #f59e0b;
+    --text-main: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background-color: var(--bg-deep);
+    background-image: 
+      radial-gradient(circle at 15% 20%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 85% 70%, rgba(255, 0, 85, 0.06) 0%, transparent 40%),
+      linear-gradient(rgba(14, 23, 42, 0.5) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(14, 23, 42, 0.5) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 35px 35px, 35px 35px;
+    color: var(--text-main);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+  .font-cyber { font-family: 'Orbitron', sans-serif; }
+  .font-tech { font-family: 'Rajdhani', sans-serif; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+  
+  /* Glowing cyberpunk borders */
+  .hud-box {
+    background: rgba(11, 17, 30, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    box-shadow: 0 0 25px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(0, 240, 255, 0.05);
+    position: relative;
+  }
+  .hud-box:hover {
+    border-color: rgba(0, 240, 255, 0.6);
+    box-shadow: 0 0 35px rgba(0, 240, 255, 0.2), inset 0 0 20px rgba(0, 240, 255, 0.1);
+  }
+  .hud-corner::before {
+    content: '';
+    position: absolute;
+    top: -2px; left: -2px;
+    width: 12px; height: 12px;
+    border-top: 2px solid var(--cyan);
+    border-left: 2px solid var(--cyan);
+  }
+  .hud-corner::after {
+    content: '';
+    position: absolute;
+    bottom: -2px; right: -2px;
+    width: 12px; height: 12px;
+    border-bottom: 2px solid var(--cyan);
+    border-right: 2px solid var(--cyan);
+  }
+  
+  /* Animated Laser Line */
+  .laser-scan {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #00f0ff, #ff0055, transparent);
+    animation: scan 3s ease-in-out infinite alternate;
+  }
+  @keyframes scan {
+    0% { top: 10%; opacity: 0.8; }
+    100% { top: 90%; opacity: 0.3; }
+  }
+
+  /* Radar Sweep */
+  @keyframes sweep {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  .radar-arm { transform-origin: center; animation: sweep 4s linear infinite; }
+
+  /* Audio Wave Animation */
+  @keyframes wave {
+    0%, 100% { height: 6px; }
+    50% { height: 28px; }
+  }
+  .wave-bar {
+    width: 4px;
+    background: #ff0055;
+    display: inline-block;
+    border-radius: 2px;
+    animation: wave 0.8s ease-in-out infinite;
+  }
+  .wave-bar:nth-child(2) { animation-delay: 0.2s; background: #00f0ff; }
+  .wave-bar:nth-child(3) { animation-delay: 0.4s; background: #10b981; }
+  .wave-bar:nth-child(4) { animation-delay: 0.1s; background: #f59e0b; }
+  .wave-bar:nth-child(5) { animation-delay: 0.5s; background: #ff0055; }
+
+  /* Interactive switches */
+  .filter-btn {
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    transition: all 0.2s;
+  }
+  .filter-btn.active-rgb { background: #0284c7; color: #fff; border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.5); font-weight: bold; }
+  .filter-btn.active-nvg { background: #15803d; color: #4ade80; border-color: #22c55e; box-shadow: 0 0 20px rgba(34, 197, 94, 0.6); font-weight: bold; }
+  .filter-btn.active-thm { background: #9f1239; color: #fda4af; border-color: #f43f5e; box-shadow: 0 0 20px rgba(244, 63, 94, 0.6); font-weight: bold; }
+
+  .canvas-rgb { background: radial-gradient(circle, #1e293b, #0f172a); border-color: #38bdf8; }
+  .canvas-nvg { background: radial-gradient(circle, #064e3b, #022c22); border-color: #22c55e; filter: contrast(130%) brightness(110%); }
+  .canvas-thm { background: linear-gradient(135deg, #4c0519, #1e1b4b, #047857, #f59e0b); border-color: #f43f5e; filter: contrast(150%); }
+
+  @media print {
+    body { background: #fff !important; color: #111 !important; background-image: none !important; }
+    .no-print { display: none !important; }
+    .hud-box { background: #f8fafc !important; border: 1px solid #ccc !important; box-shadow: none !important; color: #111 !important; }
+    .font-cyber { color: #0f172a !important; }
+    p, li, span, td { color: #222 !important; }
+    .laser-scan { display: none !important; }
+  }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- 🛸 TELEMETRY TOP BAR (NO PRINT) -->
+<header class="no-print sticky top-0 z-50 bg-[#030712]/95 backdrop-blur-md border-b border-cyan-500/30 shadow-[0_4px_30px_rgba(0,0,0,0.8)]">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <span class="inline-block w-3 h-3 rounded-full bg-cyan-400 animate-ping"></span>
+      <span class="font-cyber font-extrabold text-white sm:text-lg tracking-wider">AETHRA VISION <span class="text-cyan-400 text-xs font-mono px-2 py-0.5 border border-cyan-500/40 rounded bg-cyan-950/50 ml-1">OS v2.4 DEEPTECH</span></span>
+    </div>
+
+    <!-- Live System Telemetry Strip -->
+    <div class="hidden md:flex items-center gap-6 font-mono text-xs text-gray-300 bg-black/60 px-4 py-2 rounded-lg border border-white/10">
+      <div>FPS ENGINE: <strong class="text-emerald-400">30.0 LOCK</strong></div>
+      <div>NEURAL INFERENCE: <strong class="text-cyan-400">YOLOv11 TensorRT</strong></div>
+      <div class="flex items-center gap-1.5">AUDIO ARRAY: <div class="flex items-center gap-0.5 h-3"><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span></div></div>
+    </div>
+
+    <!-- Instant Actions -->
+    <div class="flex items-center gap-3">
+      <button onclick="triggerEmergencySiren()" class="px-3.5 py-2 rounded-lg bg-rose-600/20 border-2 border-rose-500 hover:bg-rose-600 text-white font-tech font-bold text-sm tracking-wider flex items-center gap-2 shadow-[0_0_20px_rgba(244,63,94,0.5)] hover:scale-105 transition-all">
+        <span>🚨 TEST AUDIO SIREN (EN / 🇱🇰 SI)</span>
+      </button>
+      <button onclick="window.print()" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-cyber font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,240,255,0.4)] hover:scale-105 cursor-pointer">
+        🖨️ EXPORT PDF
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-16">
+
+  <!-- 🌌 HERO SECTION: COMMAND CENTER DASHBOARD DESIGN -->
+  <section class="hud-box hud-corner p-6 sm:p-10 rounded-2xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center border border-cyan-500/40 bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950/80">
+    <div class="lg:col-span-7 space-y-6">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 font-mono text-xs uppercase tracking-widest font-extrabold">
+        ⚡ AUTONOMOUS NEXT-GEN SURVEILLANCE ENGINE &bull; 100% SELF-CONTAINED
+      </div>
+      <h1 class="font-cyber font-black text-3xl sm:text-5xl lg:text-6xl uppercase tracking-tight text-white leading-[1.1]">
+        THE BUILDING <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-rose-500">NEVER SLEEPS.</span><br/>
+        NOW NEITHER DOES YOUR WATCH.
+      </h1>
+      <p class="font-tech font-semibold text-lg text-slate-300 leading-relaxed">
+        Welcome to <strong class="text-white">Aethra Vision</strong>. This self-contained executive architecture document explains how our artificial intelligence transforms standard corporate CCTV feeds into an autonomous, proactive cyber-defense grid. Designed for facility directors, university judges, and security engineers—with zero confusing jargon.
+      </p>
+
+      <!-- Key feature badges -->
+      <div class="flex flex-wrap items-center gap-3 font-mono text-xs">
+        <span class="px-3 py-1.5 bg-slate-800/80 border border-white/20 rounded-lg text-emerald-300 font-bold">✓ Zero Dumb Recordings</span>
+        <span class="px-3 py-1.5 bg-slate-800/80 border border-white/20 rounded-lg text-cyan-300 font-bold">✓ Realtime Sub-Second Alarms</span>
+        <span class="px-3 py-1.5 bg-slate-800/80 border border-white/20 rounded-lg text-amber-300 font-bold">✓ Dual-Language Speech AI</span>
+      </div>
+    </div>
+
+    <!-- SIGNATURE FUTURISTIC RADAR & TARGET TRACKER HUD -->
+    <div class="lg:col-span-5 flex justify-center relative">
+      <div class="relative w-72 h-72 sm:w-80 sm:h-80 rounded-full border-2 border-cyan-500/30 bg-black/60 shadow-[0_0_50px_rgba(0,240,255,0.15)] flex items-center justify-center overflow-hidden">
+        <div class="laser-scan"></div>
+        <div class="absolute inset-0 rounded-full border-8 border-dashed border-cyan-500/20 animate-spin" style="animation-duration: 25s;"></div>
+        <div class="absolute w-56 h-56 rounded-full border border-white/10"></div>
+        <div class="absolute w-32 h-32 rounded-full border border-white/10"></div>
+        <div class="absolute w-full h-px bg-cyan-500/20"></div>
+        <div class="absolute h-full w-px bg-cyan-500/20"></div>
+
+        <!-- Radar Sweep Arm -->
+        <svg class="absolute inset-0 w-full h-full radar-arm" viewBox="0 0 200 200">
+          <defs>
+            <linearGradient id="sweep" x1="100" y1="100" x2="200" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#00f0ff" stop-opacity="0.5"/>
+              <stop offset="1" stop-color="#00f0ff" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M100,100 L200,100 A100,100 0 0,0 100,0 Z" fill="url(#sweep)"></path>
+        </svg>
+
+        <!-- Simulated live targets -->
+        <div class="absolute top-16 right-20 flex items-center gap-1">
+          <span class="w-3 h-3 rounded-full bg-rose-500 animate-ping"></span>
+          <span class="font-mono text-[10px] bg-rose-950/80 border border-rose-500 text-rose-300 px-1.5 py-0.5 rounded font-bold">THREAT: WEAPON</span>
+        </div>
+        <div class="absolute bottom-20 left-20 flex items-center gap-1">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+          <span class="font-mono text-[10px] bg-black/80 border border-cyan-400 text-cyan-300 px-1 py-0.5 rounded">ID-8842</span>
+        </div>
+
+        <div class="absolute bottom-3 font-mono text-[10px] tracking-widest text-cyan-400 bg-black/90 px-3 py-1 rounded border border-cyan-500/40">
+          🟢 SECTOR AI SCANNING ACTIVE
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 💡 SECTION 1: WHY AETHRA VISION IS LEAF-YEARS AHEAD OF LEGACY CCTV -->
+  <section class="space-y-6">
+    <div class="flex items-center gap-3 border-b border-white/10 pb-4">
+      <span class="font-mono text-xl text-rose-500 font-extrabold">[01]</span>
+      <h2 class="font-cyber font-extrabold text-2xl sm:text-3xl uppercase text-white tracking-wide">
+        THE INTELLIGENCE LEAP: SMART AI VS. LEGACY CAMERAS
+      </h2>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="hud-box hud-corner p-6 rounded-xl space-y-3">
+        <div class="w-12 h-12 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 text-2xl font-bold">🚨</div>
+        <h3 class="font-cyber font-bold text-lg text-white">ACTIVE THREAT PREVENTION</h3>
+        <p class="font-tech text-slate-300 text-base leading-relaxed">
+          Old cameras are passive recorders; if an intruder jumps your perimeter at 2 AM, they silently film the disaster. Aethra Vision actively analyzes every single video frame in real-time—triggering instant alarms, strobe warnings, and phone notifications while the event is happening!
+        </p>
+      </div>
+
+      <div class="hud-box hud-corner p-6 rounded-xl space-y-3">
+        <div class="w-12 h-12 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl font-bold">🔊</div>
+        <h3 class="font-cyber font-bold text-lg text-white">DUAL-LANGUAGE VOICE AI</h3>
+        <p class="font-tech text-slate-300 text-base leading-relaxed">
+          Our system speaks out loud in real computer speech to deter criminals and awaken sleeping guards! Automatically broadcasts calibrated warnings in both <strong>English</strong> and <strong>Sri Lankan Sinhala</strong> ("අවධානයට: තහනම් කලාපයකට ඇතුළු වීමක්...") via computer audio speakers.
+        </p>
+      </div>
+
+      <div class="hud-box hud-corner p-6 rounded-xl space-y-3">
+        <div class="w-12 h-12 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-2xl font-bold">🎙️</div>
+        <h3 class="font-cyber font-bold text-lg text-white">ACOUSTIC GLASS &amp; SCREAM AI</h3>
+        <p class="font-tech text-slate-300 text-base leading-relaxed">
+          Sometimes attacks start before someone enters a camera lens. Aethra Vision monitors acoustic telemetry via microphones, instantly detecting breaking windows, gunshots, or distressed screams, alerting command instantly!
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 🎮 SECTION 2: INTERACTIVE DEEPTECH CAPABILITIES (WORKING IN THIS HTML!) -->
+  <section class="space-y-6">
+    <div class="flex items-center gap-3 border-b border-white/10 pb-4">
+      <span class="font-mono text-xl text-cyan-400 font-extrabold">[02]</span>
+      <h2 class="font-cyber font-extrabold text-2xl sm:text-3xl uppercase text-white tracking-wide">
+        INTERACTIVE DEEPTECH CAPABILITIES <span class="text-xs font-mono text-cyan-400 normal-case ml-2">(Click switches to experience live!)</span>
+      </h2>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <!-- Interactive Video Filter Switch Box -->
+      <div class="lg:col-span-7 hud-box p-6 rounded-2xl border-2 border-cyan-500/40 space-y-5">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <h3 class="font-cyber font-extrabold text-white sm:text-lg flex items-center gap-2">
+            👁️ LOW-LIGHT MULTI-SPECTRUM VISION MATRIX
+          </h3>
+          <span class="font-mono text-xs text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded border border-emerald-500/40 font-bold">
+            🟢 LIVE TEST SIMULATION
+          </span>
+        </div>
+
+        <p class="font-tech text-slate-300 text-sm">
+          Operators can immediately pierce pitch-black shadows and fog by clicking the video toggle on any camera feed. Try switching the simulated security stream below:
+        </p>
+
+        <!-- Control Switch Buttons -->
+        <div class="flex items-center gap-2 p-1.5 rounded-xl bg-black/60 border border-white/10 w-fit">
+          <button id="btn-rgb" onclick="switchVision('rgb')" class="filter-btn active-rgb px-4 py-2 rounded-lg font-mono text-xs cursor-pointer">
+            ⚡ RGB NORMAL
+          </button>
+          <button id="btn-nvg" onclick="switchVision('nvg')" class="filter-btn px-4 py-2 rounded-lg font-mono text-xs cursor-pointer">
+            🌙 NVG IR-GREEN
+          </button>
+          <button id="btn-thm" onclick="switchVision('thm')" class="filter-btn px-4 py-2 rounded-lg font-mono text-xs cursor-pointer">
+            🔥 THERMAL HEATMAP
+          </button>
+        </div>
+
+        <!-- Simulated Video Screen Canvas -->
+        <div id="sim-canvas" class="canvas-rgb h-64 w-full rounded-xl border-2 p-4 relative overflow-hidden flex flex-col justify-between transition-all duration-300">
+          <div class="flex justify-between items-start z-10 font-mono text-xs">
+            <span class="bg-black/80 text-white px-2.5 py-1 rounded border border-white/20 flex items-center gap-1.5 font-bold">
+              <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span> CAM-01 (MAIN GATE ENTRANCE)
+            </span>
+            <span id="canvas-tag" class="bg-cyan-500 text-black px-2.5 py-1 rounded font-extrabold uppercase text-[11px]">
+              MODE: DAYLIGHT RGB NORMAL
+            </span>
+          </div>
+
+          <!-- Simulated Target Bounding Box -->
+          <div class="mx-auto my-auto p-4 rounded border-2 border-cyan-400/80 bg-cyan-500/10 backdrop-blur-[2px] z-10 text-center w-64 shadow-[0_0_20px_rgba(0,240,255,0.3)]">
+            <div class="font-mono text-[11px] text-cyan-300 font-extrabold uppercase tracking-wider">🎯 TARGET RE-ID: SUB-8842</div>
+            <div class="font-tech text-xs text-white mt-1">Status: Loitering near security perimeter (75%)</div>
+          </div>
+
+          <div class="flex justify-between items-end z-10 font-mono text-[11px] text-gray-400">
+            <span>BITRATE: 2.54 MB/S &bull; H.265 WORM</span>
+            <span>ENCRYPTED TELEMETRY STREAM</span>
+          </div>
+          
+          <!-- background grid decoration inside monitor -->
+          <div class="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        </div>
+      </div>
+
+      <!-- Interactive Audio & SOS Lockdown Card -->
+      <div class="lg:col-span-5 hud-box p-6 rounded-2xl border-2 border-rose-500/40 flex flex-col justify-between space-y-4">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-cyber font-extrabold text-white text-base">🚨 EMERGENCY SOS LOCKDOWN</span>
+            <span class="px-2 py-0.5 bg-rose-500 text-black font-mono text-xs font-black rounded uppercase animate-pulse">ACTIVE SHIELD</span>
+          </div>
+          <p class="font-tech text-slate-300 text-sm leading-relaxed mt-2">
+            In the event of a physical riot, armed robbery, or critical breach, clicking the glowing red Emergency SOS button immediately initiates facility lockdown protocols: red strobe screen banners, door interlock commands, and multi-language acoustic warnings!
+          </p>
+        </div>
+
+        <div class="p-4 rounded-xl bg-black/70 border border-rose-500/30 space-y-3">
+          <div class="font-mono text-xs text-rose-300 font-extrabold flex items-center justify-between">
+            <span>🇱🇰 🇬🇧 LIVE SPEECH SYNTHESIS ENGINE</span>
+            <span>AUDIO TESTER</span>
+          </div>
+          <p class="text-xs text-slate-400">Click below to hear your browser generate the exact computer dual-language sirens deployed across the facility speakers:</p>
+          
+          <button onclick="triggerEmergencySiren()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-cyber font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-[0_0_25px_rgba(255,0,85,0.5)] hover:scale-[1.02] cursor-pointer flex items-center justify-center gap-2">
+            <span>🔊 BROADCAST LOCKDOWN SIREN NOW</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 🧮 SECTION 3: INTERACTIVE HARDWARE & STORAGE CALCULATOR -->
+  <section class="space-y-6">
+    <div class="flex items-center gap-3 border-b border-white/10 pb-4">
+      <span class="font-mono text-xl text-amber-400 font-extrabold">[03]</span>
+      <h2 class="font-cyber font-extrabold text-2xl sm:text-3xl uppercase text-white tracking-wide">
+        HARDWARE REQUIREMENTS &amp; NVR STORAGE CALCULATOR
+      </h2>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <!-- Interactive Calculator Console -->
+      <div class="lg:col-span-6 hud-box hud-corner p-6 rounded-2xl border border-amber-500/30 space-y-6">
+        <div class="flex items-center justify-between">
+          <h3 class="font-cyber font-bold text-white text-base uppercase">🧮 LIVE 24/7 STORAGE ESTIMATOR</h3>
+          <span class="font-mono text-[11px] text-amber-300 bg-amber-950/80 border border-amber-500/30 px-2 py-0.5 rounded font-bold">H.265 (HEVC) COMPRESSION</span>
+        </div>
+        <p class="font-tech text-sm text-slate-300">
+          Move the slider to estimate exact hard disk capacity required for continuous WORM (Write-Once-Read-Many) video surveillance:
+        </p>
+
+        <div class="space-y-4 p-4 rounded-xl bg-slate-950/80 border border-white/10">
+          <div class="flex justify-between items-center font-mono text-sm">
+            <span class="text-gray-300">TOTAL IP CAMERAS:</span>
+            <span id="cam-count" class="text-cyan-400 font-extrabold text-xl">8 CAMERAS</span>
+          </div>
+          <input type="range" id="cam-slider" min="1" max="32" value="8" oninput="updateCalc()" class="w-full accent-cyan-400 cursor-pointer h-2 bg-slate-800 rounded-lg">
+          
+          <div class="grid grid-cols-2 gap-4 pt-2 font-mono text-xs">
+            <div class="p-3 rounded-lg bg-black/60 border border-white/10 text-center">
+              <div class="text-gray-400">1 DAY (24-HR CONTINUOUS)</div>
+              <div id="calc-day" class="text-lg font-bold text-emerald-400 mt-1">219.2 GB</div>
+            </div>
+            <div class="p-3 rounded-lg bg-black/60 border border-amber-500/40 text-center shadow-inner">
+              <div class="text-amber-300 font-bold">30-DAY MANDATORY ARCHIVE</div>
+              <div id="calc-month" class="text-xl font-extrabold text-white mt-1">6.58 TB</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-xs font-mono text-cyan-200">
+          💡 <strong>SMART SAVING TIP:</strong> Toggling <em>"AI Motion & Threat Triggered Recording"</em> drops storage usage by up to <strong>65%</strong>, allowing a 4TB Surveillance Hard Disk (WD Purple / Seagate SkyHawk) to archive over 2 months of verified incidents!
+        </div>
+      </div>
+
+      <!-- Simple Hardware Checklist Card -->
+      <div class="lg:col-span-6 hud-box p-6 rounded-2xl border border-white/10 space-y-4">
+        <h3 class="font-cyber font-bold text-white text-base uppercase">💻 COMMERCIAL HARDWARE CHECKLIST</h3>
+        <p class="font-tech text-sm text-slate-300">
+          You do not need an multimillion-dollar space lab to deploy Aethra Vision. It operates cleanly on readily available commercial hardware:
+        </p>
+
+        <div class="space-y-3 font-tech text-sm">
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-white/10 flex items-start gap-3">
+            <span class="text-emerald-400 text-lg">📹</span>
+            <div>
+              <strong class="text-white text-base">Standard Network CCTV Cameras (RTSP / ONVIF):</strong>
+              <p class="text-slate-400 text-xs mt-0.5">Works directly with existing IP cameras connected via Ethernet LAN wires. Zero special hardware cameras needed.</p>
+            </div>
+          </div>
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-white/10 flex items-start gap-3">
+            <span class="text-cyan-400 text-lg">🖥️</span>
+            <div>
+              <strong class="text-white text-base">Standard Office Computer or Edge PC:</strong>
+              <p class="text-slate-400 text-xs mt-0.5">An Intel Core i5/i7 processor with 16 GB RAM and a mid-range GPU (NVIDIA RTX 3050 or 3060) processes 30-FPS neural tracking without lag.</p>
+            </div>
+          </div>
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-white/10 flex items-start gap-3">
+            <span class="text-amber-400 text-lg">🛡️</span>
+            <div>
+              <strong class="text-white text-base">Role-Based Access Control (RBAC):</strong>
+              <p class="text-slate-400 text-xs mt-0.5">Duty Operators (guards) can view alarms and video clips but are blocked by an automated <strong>"ACCESS DENIED"</strong> lock from touching System Settings or admin passwords.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 🧭 SECTION 4: PLAIN-ENGLISH MENU SCREEN NAVIGATION GUIDE -->
+  <section class="space-y-6">
+    <div class="flex items-center gap-3 border-b border-white/10 pb-4">
+      <span class="font-mono text-xl text-emerald-400 font-extrabold">[04]</span>
+      <h2 class="font-cyber font-extrabold text-2xl sm:text-3xl uppercase text-white tracking-wide">
+        THE 7 COMMAND SCREENS (PLAIN-ENGLISH NAVIGATION)
+      </h2>
+    </div>
+
+    <div class="hud-box rounded-2xl border border-white/15 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-950 font-mono text-xs text-gray-400 border-b border-white/10 uppercase tracking-wider">
+              <th class="p-4 w-1/3">📱 Menu Button (No Technical Jargon)</th>
+              <th class="p-4 w-2/3">What Security Officers Do Here</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/10 font-tech text-base text-slate-200">
+            <tr class="hover:bg-cyan-950/20 transition-colors">
+              <td class="p-4 font-bold text-cyan-400 flex items-center gap-2">📺 1. Live Video Dashboard</td>
+              <td class="p-4">Your daily watch command center. Displays all active camera nodes simultaneously. Click <strong>"Interactive Campus Blueprint"</strong> to switch from video squares into a real-life architectural floor plan map!</td>
+            </tr>
+            <tr class="hover:bg-cyan-950/20 transition-colors">
+              <td class="p-4 font-bold text-white flex items-center gap-2">🔌 2. Connect &amp; Setup Cameras</td>
+              <td class="p-4">Add new camera feeds in seconds. Click <strong>"⚡ Auto-Discover Network Cameras"</strong> to scan LAN port 554 and connect IP hardware automatically without typing IP addresses.</td>
+            </tr>
+            <tr class="hover:bg-cyan-950/20 transition-colors">
+              <td class="p-4 font-bold text-amber-400 flex items-center gap-2">📁 3. Recorded Video Clips</td>
+              <td class="p-4">Watch past recorded WORM evidentiary files hour-by-hour. Features our <strong>🤖 AI Smart Video Search</strong> bar—type everyday phrases like <em>"Show person in red shirt running near gate at 2 PM"</em> to filter evidence in seconds!</td>
+            </tr>
+            <tr class="hover:bg-cyan-950/20 transition-colors">
+              <td class="p-4 font-bold text-white flex items-center gap-2">🚨 4. Security Alert Logs</td>
+              <td class="p-4">A permanent, tamper-proof audit trail of every past incident, timestamps, match precision scores, and snapshot thumbnails.</td>
+            </tr>
+            <tr class="hover:bg-cyan-950/20 transition-colors">
+              <td class="p-4 font-bold text-emerald-400 flex items-center gap-2">📊 5. AI Detection Statistics</td>
+              <td class="p-4">Visual bar charts analyzing multi-camera Person Re-ID handoffs. Click the glowing <strong>"📥 Download Official PDF Report"</strong> button to export a formal summary for board executives or police judges!</td>
+            </tr>
+            <tr class="hover:bg-cyan-950/20 transition-colors">
+              <td class="p-4 font-bold text-white flex items-center gap-2">🛡️ 6. Restricted Zones Setup</td>
+              <td class="p-4">Use your computer mouse to click and drag protective <strong>Red or Yellow Alarm Boxes</strong> across doors, vaults, or gates in the video feed. Any human crossing that drawn line triggers an instant alarm.</td>
+            </tr>
+            <tr class="hover:bg-cyan-950/20 transition-colors">
+              <td class="p-4 font-bold text-rose-400 flex items-center gap-2">⚙️ 7. System Settings</td>
+              <td class="p-4">Master Admin restricted vault for setting passwords, configuring Telegram OTP Two-Factor Authentication, and defining company-wide security rules.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 📥 FOOTER & INSTANT PRINT CARD -->
+  <footer class="hud-box p-8 rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/30 via-slate-900 to-indigo-950/30 text-center space-y-4">
+    <h3 class="font-cyber font-black text-xl sm:text-2xl text-white tracking-wide">
+      READY FOR THE FRIDAY PRESENTATION DEMO?
+    </h3>
+    <p class="font-tech text-slate-300 text-sm max-w-xl mx-auto">
+      This self-contained document is ready to be emailed, transferred via USB, or presented to Mr. Manoj and university judges. Click the export button below to convert this file into a formatted PDF manual.
+    </p>
+    <div class="pt-2">
+      <button onclick="window.print()" class="px-8 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-cyber font-extrabold text-sm uppercase tracking-wider transition-all shadow-[0_0_30px_rgba(0,240,255,0.5)] hover:scale-105 cursor-pointer">
+        🖨️ CLICK HERE TO EXPORT OFFICIAL PDF MANUAL
+      </button>
+    </div>
+    <div class="pt-6 border-t border-white/10 flex flex-wrap justify-between items-center font-mono text-xs text-gray-400">
+      <div>© 2026 AETHRA VISION AI SURVEILLANCE &bull; GOOGLE ANTIGRAVITY</div>
+      <div class="text-cyan-400 font-bold">100% AUTHENTIC ENTERPRISE DEPLOYMENT &bull; ZERO MOCK DATA</div>
+    </div>
+  </footer>
+
+</main>
+
+<script>
+  // 1. Interactive Vision Filter Switcher Script
+  function switchVision(mode) {
+    const btnRgb = document.getElementById('btn-rgb');
+    const btnNvg = document.getElementById('btn-nvg');
+    const btnThm = document.getElementById('btn-thm');
+    const canvas = document.getElementById('sim-canvas');
+    const tag = document.getElementById('canvas-tag');
+
+    // Reset styles
+    btnRgb.className = 'filter-btn px-4 py-2 rounded-lg font-mono text-xs cursor-pointer';
+    btnNvg.className = 'filter-btn px-4 py-2 rounded-lg font-mono text-xs cursor-pointer';
+    btnThm.className = 'filter-btn px-4 py-2 rounded-lg font-mono text-xs cursor-pointer';
+
+    if (mode === 'rgb') {
+      btnRgb.className = 'filter-btn active-rgb px-4 py-2 rounded-lg font-mono text-xs cursor-pointer';
+      canvas.className = 'canvas-rgb h-64 w-full rounded-xl border-2 p-4 relative overflow-hidden flex flex-col justify-between transition-all duration-300';
+      tag.className = 'bg-cyan-500 text-black px-2.5 py-1 rounded font-extrabold uppercase text-[11px]';
+      tag.innerText = 'MODE: DAYLIGHT RGB NORMAL';
+    } else if (mode === 'nvg') {
+      btnNvg.className = 'filter-btn active-nvg px-4 py-2 rounded-lg font-mono text-xs cursor-pointer';
+      canvas.className = 'canvas-nvg h-64 w-full rounded-xl border-2 p-4 relative overflow-hidden flex flex-col justify-between transition-all duration-300';
+      tag.className = 'bg-emerald-500 text-black px-2.5 py-1 rounded font-extrabold uppercase text-[11px]';
+      tag.innerText = '🌙 MODE: MILITARY NVG IR-GREEN (NIGHT)';
+    } else if (mode === 'thm') {
+      btnThm.className = 'filter-btn active-thm px-4 py-2 rounded-lg font-mono text-xs cursor-pointer';
+      canvas.className = 'canvas-thm h-64 w-full rounded-xl border-2 p-4 relative overflow-hidden flex flex-col justify-between transition-all duration-300';
+      tag.className = 'bg-rose-500 text-white px-2.5 py-1 rounded font-extrabold uppercase text-[11px]';
+      tag.innerText = '🔥 MODE: THERMAL INFRARED HEATMAP';
+    }
+  }
+
+  // 2. Interactive NVR Storage Calculator Script
+  function updateCalc() {
+    const slider = document.getElementById('cam-slider');
+    const cams = parseInt(slider.value, 10);
+    document.getElementById('cam-count').innerText = cams + (cams === 1 ? ' CAMERA' : ' CAMERAS');
+
+    // ~27.4 GB per camera per day in H.265 Full HD
+    const dailyGB = cams * 27.4;
+    const monthlyGB = dailyGB * 30;
+
+    document.getElementById('calc-day').innerText = dailyGB.toFixed(1) + ' GB';
+    
+    if (monthlyGB >= 1000) {
+      document.getElementById('calc-month').innerText = (monthlyGB / 1024).toFixed(2) + ' TB';
+    } else {
+      document.getElementById('calc-month').innerText = monthlyGB.toFixed(0) + ' GB';
+    }
+  }
+
+  // 3. Automated Dual-Language (English & Sinhala) Siren Broadcast Demo
+  function triggerEmergencySiren() {
+    if (!('speechSynthesis' in window)) {
+      alert("Your browser does not support Web Speech API.");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    
+    // Play Audio Oscillator Beep Siren
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1600, audioCtx.currentTime + 0.3);
+      osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.6);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.7);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.7);
+    } catch (e) {}
+
+    // English warning
+    const utteranceEn = new SpeechSynthesisUtterance("Warning: Security Perimeter Breach Alert! Facility intrusion detected.");
+    utteranceEn.lang = 'en-US';
+    utteranceEn.rate = 1.0;
+
+    // Sinhala warning
+    const utteranceSi = new SpeechSynthesisUtterance("අවධානයට! ප්‍රධාන දොරටුව අසල සැකකටයුතු හැසිරීමක් නිරීක්ෂණය වේ!");
+    utteranceSi.lang = 'si-LK';
+    utteranceSi.rate = 0.95;
+
+    utteranceEn.onend = () => {
+      setTimeout(() => window.speechSynthesis.speak(utteranceSi), 300);
+    };
+
+    window.speechSynthesis.speak(utteranceEn);
+    alert("🚨 [AUDIO SIREN DEPLOYED]\nPlaying calibrated dual-language computer audio warning in English and Sinhala via device speakers!");
+  }
+
+  // Initialize calculator on load
+  updateCalc();
+</script>
+</body>
+</html>

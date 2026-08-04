@@ -86,16 +86,18 @@ class TelegramNotifier:
         except Exception as e:
             print(f"Failed to send welcome message: {e}")
         
-    def send_alert(self, message: str, frame=None):
+    def send_alert(self, message: str, frame=None, clip_url: str = ""):
         if not self.enabled:
             return
             
         # Run in a separate thread so we don't block the video stream
-        threading.Thread(target=self._send_sync, args=(message, frame), daemon=True).start()
+        threading.Thread(target=self._send_sync, args=(message, frame, clip_url), daemon=True).start()
         
-    def _send_sync(self, message: str, frame):
+    def _send_sync(self, message: str, frame, clip_url: str = ""):
         try:
             url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+            
+            clip_text = f"\n\n🔗 Video Clip: http://192.168.1.3:8000{clip_url}" if clip_url else ""
             
             # If we have an image, send a photo instead
             if frame is not None:
@@ -105,7 +107,7 @@ class TelegramNotifier:
                 ret, buffer = cv2.imencode('.jpg', frame)
                 if ret:
                     files = {'photo': ('alert.jpg', buffer.tobytes(), 'image/jpeg')}
-                    data = {'chat_id': self.chat_id, 'caption': f"🚨 AETHRA VISION ALERT 🚨\n{message}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"}
+                    data = {'chat_id': self.chat_id, 'caption': f"🚨 AETHRA VISION ALERT 🚨\n{message}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{clip_text}"}
                     
                     response = requests.post(photo_url, data=data, files=files, timeout=5)
                     return
@@ -113,7 +115,7 @@ class TelegramNotifier:
             # Fallback to text message if no image or encoding failed
             data = {
                 "chat_id": self.chat_id,
-                "text": f"🚨 AETHRA VISION ALERT 🚨\n{message}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                "text": f"🚨 AETHRA VISION ALERT 🚨\n{message}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{clip_text}"
             }
             requests.post(url, data=data, timeout=5)
             

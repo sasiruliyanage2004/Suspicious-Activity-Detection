@@ -1,107 +1,39 @@
-# ========================================================
-# 1. NODE.JS & DEPENDENCIES
-# ========================================================
+# Dependencies
 node_modules/
-.npm/
-.pnpm-store/
-.eslintcache
-.stylelintcache
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+.next/
+out/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-# ========================================================
-# 2. BUILD OUTPUTS & CACHES
-# ========================================================
-dist/
-build/
-out/
-.next/
-.nuxt/
-.output/
+# Cache
 .cache/
-*.tsbuildinfo
-storybook-static/
+.parcel-cache/
+.vite/
 
-# ========================================================
-# 3. SECRETS, LICENSE KEYS, TOKENS & PRIVATE CONFIGS
-# (Critical for security: API keys, bot tokens, PII)
-# ========================================================
-*.license.json
-licenses_registry.json
-public/*.license.json
-*.pem
-*.key
-*.cert
-*.cert.pem
-*.pfx
-*.p12
-*.der
-secret*.json
-jwt*.json
-token*.json
-credentials*.json
-service_account*.json
-client_secret*.json
-private_*.json
-config.local.js
-config.local.json
-settings.local.js
-.env
-.env.*
-!.env.example
-*.env.local
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
 
-# ========================================================
-# 4. VIDEO ARCHIVES, SNAPSHOTS & MEDIA DOWNLOADS
-# (Never push CCTV feeds or browser downloads to repo)
-# ========================================================
-archive/
-nvr_archive/
-recordings/
-videos/
-snapshots/
-evidence/
-captures/
-threat_captures/
-intruders/
-alerts_media/
-storage/
-uploads/
-downloads/
-temp_clips/
-*.mp4
-*.mkv
-*.avi
-*.mov
-*.flv
-*.wmv
-*.ts
-
-# ========================================================
-# 5. LOGS & TEMPORARY FILES
-# ========================================================
-*.log
-logs/
-*.tmp
-*.bak
-*.swp
-*.~*
-temp/
-tmp/
-
-# ========================================================
-# 6. OS, IDE & EDITOR FILES
-# ========================================================
+# IDE
 .vscode/
 .idea/
-*.suo
-*.sln
-*.user
-.DS_Store
-.DS_Store?
-Thumbs.db
-ehthumbs.db
-desktop.ini
+*.swp
+*.swo

@@ -30,6 +30,7 @@ class APIClient:
                 print(f"Failed to send alert: {response.text}")
         except Exception as e:
             print(f"Error connecting to backend: {e}")
+        return clip_url, snapshot_url
             
     def get_zone(self, camera_id: str):
         try:

@@ -1,123 +1,97 @@
-# ========================================================
-# 1. DATABASES & LOCAL STORAGE STATE
-# (Never commit SQLite databases or migration caches)
-# ========================================================
-*.db
-*.sqlite
-*.sqlite3
-*.db-journal
-*.dump
-*.sql
-sql_app.db
-mongo_data/
-postgres_data/
-redis_data/
-
-# ========================================================
-# 2. PYTHON & VIRTUAL ENVIRONMENTS
-# ========================================================
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
+*.pyc
+*.pyo
+*.pyd
 .Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.so
+
+# Virtual environments
 .venv/
 venv/
 env/
 ENV/
-env.bak/
-venv.bak/
-.pytest_cache/
-.mypy_cache/
-.tox/
-*.egg-info/
-.eggs/
-dist/
-build/
-develop-eggs/
-sdist/
-wheels/
-*.egg
 
-# ========================================================
-# 3. SECRETS, LICENSE KEYS, TOKENS & PRIVATE CONFIGS
-# (Critical for security: API keys, bot tokens, PII)
-# ========================================================
-*.license.json
-licenses_registry.json
-*.pem
-*.key
-*.cert
-*.cert.pem
-*.pfx
-*.p12
-*.der
-id_rsa*
-secret*.json
-jwt*.json
-token*.json
-credentials*.json
-service_account*.json
-client_secret*.json
-private_*.json
-secrets.py
-secrets.json
-config.local.py
-config.local.json
-settings.local.py
+# Database & sensitive files
+*.db
+*.sqlite
+*.sqlite3
+sql_app.db
+
+# Recordings and evidence vault (large binary files)
+recordings_vault/
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.jpg
+*.jpeg
+*.png
+
+# Environment variables / secrets
 .env
 .env.*
-!.env.example
-*.env.local
+*.key
+*.pem
+secrets.json
 
-# ========================================================
-# 4. MEDIA UPLOADS, RECORDINGS & ARCHIVES
-# ========================================================
-archive/
-recordings/
-recordings_vault/
-videos/
-snapshots/
-evidence/
-captures/
-threat_captures/
-storage/
-uploads/
-downloads/
-output/
-streams/
-temp_clips/
-*.mp4
-*.mkv
-*.avi
-*.mov
-*.flv
-*.wmv
-
-# ========================================================
-# 5. LOGS & TEMPORARY FILES
-# ========================================================
+# Logs
 *.log
 logs/
-*.tmp
-*.bak
-*.swp
-*.~*
-temp/
-tmp/
-debug/
-error.log
 
-# ========================================================
-# 6. OS, IDE & EDITOR FILES
-# ========================================================
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
 .vscode/
 .idea/
-*.suo
-*.sln
-*.user
+*.swp
+*.swo
+
+*.egg
+*.egg-info/
+dist/
+build/
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Database & sensitive files
+*.db
+*.sqlite
+*.sqlite3
+sql_app.db
+
+# Environment variables / secrets
+.env
+.env.*
+*.key
+*.pem
+secrets.json
+
+# Logs
+*.log
+logs/
+
+# OS files
 .DS_Store
-.DS_Store?
 Thumbs.db
-ehthumbs.db
 desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

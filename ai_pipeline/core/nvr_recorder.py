@@ -6,9 +6,8 @@ from datetime import datetime
 from collections import deque
 
 class NVRRecorder:
-    def __init__(self, vault_path=None, buffer_maxlen=50):
+    def __init__(self, vault_path=None, buffer_maxlen=150):
         if vault_path is None:
-            # Point directly to the backend static vault directory
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
             self.vault_path = os.path.join(base_dir, "backend", "recordings_vault")
         else:
@@ -18,6 +17,7 @@ class NVRRecorder:
         self.buffers = {}
         self.buffer_maxlen = buffer_maxlen
         self.lock = threading.Lock()
+        self.active_recordings = {}  # { camera_id: [list_of_target_queues] }
 
     def add_frame(self, camera_id, frame):
         if frame is None:
@@ -26,52 +26,73 @@ class NVRRecorder:
             if camera_id not in self.buffers:
                 self.buffers[camera_id] = deque(maxlen=self.buffer_maxlen)
             self.buffers[camera_id].append(frame.copy())
+            
+            # Feed frame to any actively encoding incident clips (Post-event capture)
+            if camera_id in self.active_recordings:
+                for q in self.active_recordings[camera_id]:
+                    try: q.append(frame.copy())
+                    except Exception: pass
 
     def record_incident(self, camera_id, behavior_type, current_frame):
-        """Asynchronously extracts snapshot & encodes buffered video clip without blocking live stream."""
-        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:19]
-        safe_type = behavior_type.lower().replace(" ", "_").replace("/", "_")
-        safe_cam = str(camera_id).replace("-", "_")
+        """Asynchronously extracts HD snapshot & encodes buffered video clip with both pre-event and live post-event footage."""
+        timestamp_str = datetime.now().strftime("%Y%m%d-%H%M%S-%f")[:19]
+        safe_type = behavior_type.lower().replace(" ", "-").replace("/", "-")
+        safe_cam = str(camera_id).replace("_", "-")
         
-        base_name = f"inc_{safe_cam}_{safe_type}_{timestamp_str}"
+        base_name = f"inc-{safe_cam}-{safe_type}-{timestamp_str}"
         snap_filename = f"{base_name}.jpg"
         clip_filename = f"{base_name}.mp4"
         
         snap_path = os.path.join(self.vault_path, snap_filename)
         clip_path = os.path.join(self.vault_path, clip_filename)
         
-        # Retrieve buffered frames for clip generation
+        # Retrieve pre-event frames from circular RAM buffer
         with self.lock:
-            frames_to_write = list(self.buffers.get(camera_id, []))
-            if current_frame is not None and (not frames_to_write or not np_array_equal(frames_to_write[-1], current_frame)):
-                frames_to_write.append(current_frame.copy())
-            elif current_frame is None and frames_to_write:
-                current_frame = frames_to_write[-1].copy()
+            pre_frames = list(self.buffers.get(camera_id, []))[-60:] # Last ~4 seconds before threat
+            if current_frame is not None:
+                pre_frames.append(current_frame.copy())
+            elif not current_frame and pre_frames:
+                current_frame = pre_frames[-1].copy()
+                
+            post_queue = []
+            if camera_id not in self.active_recordings:
+                self.active_recordings[camera_id] = []
+            self.active_recordings[camera_id].append(post_queue)
 
         # Save HD snapshot immediately
         if current_frame is not None:
             try:
-                cv2.imwrite(snap_path, current_frame, [cv2.IMWRITE_JPEG_QUALITY, 88])
+                cv2.imwrite(snap_path, current_frame, [cv2.IMWRITE_JPEG_QUALITY, 92])
             except Exception:
                 pass
         
-        # Write MP4 clip asynchronously
+        # Write MP4 clip asynchronously with real live post-event frames
         def encode_clip():
-            if not frames_to_write:
-                return
             try:
-                h, w, _ = frames_to_write[0].shape
-                # Use mp4v codec which works out of the box on Windows OpenCV without external FFmpeg DLL errors
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                # Wait up to 3.0 seconds to actively collect live post-incident frames as the action unfolds
+                start_w = time.time()
+                while time.time() - start_w < 3.0 and len(post_queue) < 45:
+                    time.sleep(0.1)
+                
+                with self.lock:
+                    if camera_id in self.active_recordings and post_queue in self.active_recordings[camera_id]:
+                        self.active_recordings[camera_id].remove(post_queue)
+                
+                all_frames = pre_frames + post_queue
+                if not all_frames:
+                    return
+                    
+                h, w, _ = all_frames[0].shape
+                fourcc = cv2.VideoWriter_fourcc(*'avc1')
                 out = cv2.VideoWriter(clip_path, fourcc, 15.0, (w, h))
-                for f in frames_to_write:
+                for f in all_frames:
                     out.write(f)
-                # To make sure clip lasts at least 2-3 seconds during rapid events, loop frame buffer slightly if too short
-                if len(frames_to_write) < 25:
-                    for _ in range(25 - len(frames_to_write)):
-                        out.write(frames_to_write[-1])
+                # Ensure minimum playable clip length
+                if len(all_frames) < 30:
+                    for _ in range(30 - len(all_frames)):
+                        out.write(all_frames[-1])
                 out.release()
-            except Exception:
+            except Exception as e:
                 pass
 
         threading.Thread(target=encode_clip, daemon=True).start()
