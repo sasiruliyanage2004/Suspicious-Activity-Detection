@@ -52,6 +52,28 @@ export default function Header({
 }) {
   const [profileOpen, setProfileOpen] = useState(false)
   const [gatesLocked, setGatesLocked] = useState(false)
+  const [currentTime, setCurrentTime] = useState(new Date())
+  
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  
+  const getGreeting = () => {
+    const hour = currentTime.getHours()
+    if (hour < 12) return 'GOOD MORNING'
+    if (hour < 17) return 'GOOD AFTERNOON'
+    return 'GOOD EVENING'
+  }
+  
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
+  }
+  
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+  }
+
   const isOperator = activeUser?.role === 'operator'
   const displayName = activeUser?.name || 'Commander Master Admin'
 
@@ -83,6 +105,25 @@ export default function Header({
             <p className="hidden sm:block font-mono text-[9px] tracking-[0.18em] text-white/30 uppercase">
               Command Grid
             </p>
+          </div>
+        </div>
+
+        {/* Dynamic Greeting & Clock */}
+        <div className="hidden md:flex items-center gap-4 ml-4">
+          <div className="w-[1px] h-8 bg-white/10" />
+          <div className="flex flex-col">
+            <span className="font-sans text-[11px] font-medium tracking-widest text-cyan-400">
+              {getGreeting()}, COMMANDER
+            </span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="font-mono text-[10px] text-white/70">
+                {formatDate(currentTime)}
+              </span>
+              <span className="w-1 h-1 rounded-full bg-white/20" />
+              <span className="font-mono text-[10px] text-white">
+                {formatTime(currentTime)}
+              </span>
+            </div>
           </div>
         </div>
 
