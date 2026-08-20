@@ -1,5 +1,6 @@
 <div align="center">
-  <h1>??? Aethra Vision Core</h1>
+  <img src="frontend/public/logo.png" width="300" alt="Aethra Vision Core Logo">
+  <h1>Aethra Vision Core</h1>
   <h3>Enterprise-Grade AI CCTV Surveillance & Threat Detection System</h3>
   
   <p>
