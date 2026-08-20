@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { speechSiren } from './utils/speechSiren.js'
+import SplashScreen from './components/SplashScreen.jsx'
+import Ticker from './components/Ticker.jsx'
 import AuthScreen from './components/AuthScreen.jsx'
 import Header from './components/Header.jsx'
 import Sidebar from './components/Sidebar.jsx'
@@ -37,6 +39,7 @@ function loadCamerasFromStorage() {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
   const [activeUser, setActiveUser] = useState(null)
   const [activeTab, setActiveTab] = useState('grid')
@@ -108,43 +111,60 @@ export default function App() {
     if (!authenticated) return;
     
     let ws = null;
-    try {
-      ws = new WebSocket('ws://127.0.0.1:8000/ws/alerts');
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data && data.behavior_type) {
-            // 1. Trigger Audio Siren globally!
-            speechSiren.speakAlarm(data.behavior_type, data.camera_id);
-            
-            // 2. Update Dashboard UI state to show the live threat pulse
-            const targetCamIdRegex = /\d+/;
-            const camIdMatch = data.camera_id ? String(data.camera_id).match(targetCamIdRegex) : null;
-            const camIdNum = camIdMatch ? parseInt(camIdMatch[0]) : null;
+    let reconnectTimeout = null;
 
-            setCameras(prev => prev.map(c => {
-              if (c.code === data.camera_id || c.id === camIdNum) {
-                return { ...c, threat: { label: data.behavior_type, confidence: data.confidence || 0.99 } };
-              }
-              return c;
-            }));
+    const connectWS = () => {
+      try {
+        ws = new WebSocket('ws://127.0.0.1:8000/ws/alerts');
+        
+        ws.onopen = () => {
+          console.log('Threat Alerts WebSocket Connected');
+        };
 
-            // Clear the visual threat on dashboard after 15 seconds
-            setTimeout(() => {
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data && data.behavior_type) {
+              speechSiren.speakAlarm(data.behavior_type, data.camera_id);
+              
+              const targetCamIdRegex = /\d+/;
+              const camIdMatch = data.camera_id ? String(data.camera_id).match(targetCamIdRegex) : null;
+              const camIdNum = camIdMatch ? parseInt(camIdMatch[0]) : null;
+
               setCameras(prev => prev.map(c => {
                 if (c.code === data.camera_id || c.id === camIdNum) {
-                  return { ...c, threat: null };
+                  return { ...c, threat: { label: data.behavior_type, confidence: data.confidence || 0.99, x: 2, y: 15 } };
                 }
                 return c;
               }));
-            }, 15000);
-          }
-        } catch (e) {}
-      };
-    } catch (err) {}
+
+              setTimeout(() => {
+                setCameras(prev => prev.map(c => {
+                  if (c.code === data.camera_id || c.id === camIdNum) {
+                    return { ...c, threat: null };
+                  }
+                  return c;
+                }));
+              }, 15000);
+            }
+          } catch (e) {}
+        };
+
+        ws.onclose = () => {
+          reconnectTimeout = setTimeout(connectWS, 2000);
+        };
+        
+        ws.onerror = () => {
+          ws.close();
+        };
+      } catch (err) {}
+    };
+
+    connectWS();
     
     return () => {
       if (ws) ws.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
     }
   }, [authenticated]);
 
@@ -178,6 +198,10 @@ export default function App() {
     };
   }, [authenticated, activeUser]);
 
+  if (showSplash) {
+    return <SplashScreen onComplete={() => setShowSplash(false)} />
+  }
+
   if (!authenticated) {
     return <AuthScreen onAuthenticated={handleLogin} />
   }
@@ -187,7 +211,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col pb-7">
       {/* 🚨 Emergency Lockdown Strobe Warning Banner */}
       <div id="lockdown-strobe-banner" className="hidden z-[99999] bg-red-700 text-white font-mono px-6 py-3.5 border-b-2 border-yellow-300 shadow-[0_0_40px_rgba(255,0,0,0.9)] animate-bounce flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
         <div className="flex items-center gap-3">
@@ -292,6 +316,8 @@ export default function App() {
       {showOperatorModal && (
         <OperatorProvisioningModal onClose={() => setShowOperatorModal(false)} />
       )}
+      
+      <Ticker />
     </div>
   )
 }

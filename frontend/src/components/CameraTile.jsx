@@ -1,5 +1,6 @@
 import React, { useState, memo } from 'react'
 import { Pencil, Check, TriangleAlert, Video, Radio, Activity, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Crosshair } from 'lucide-react'
+import { playBleep } from '../utils/sounds.js'
 
 function FeedBackdrop({ seed = 0, cameraCode, location }) {
   const hue = (seed * 47) % 360
@@ -73,6 +74,7 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
 
   const handlePTZ = (e, direction) => {
     e.stopPropagation()
+    playBleep()
     if (!camera?.code) return
     fetch(`http://127.0.0.1:8002/api/cameras/${camera.code}/ptz_control`, {
       method: 'POST',
@@ -94,13 +96,14 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
     setEditing(false)
   }
 
+  const [timestamp, setTimestamp] = useState('')
+
   // ── Auto Reconnect MJPEG Stream on Packet Drop (Never Permanently Kills Stream) ──
   const handleStreamError = (e) => {
     setIsReconnecting(true)
-    const target = e.target
     setTimeout(() => {
-      if (target && camera.streamUrl) {
-        target.src = `${camera.streamUrl}?t=${Date.now()}`
+      if (camera.streamUrl) {
+        setTimestamp(`?t=${Date.now()}`)
         setIsReconnecting(false)
       }
     }, 1200)
@@ -108,6 +111,7 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
 
   const cycleFilter = (e) => {
     e.stopPropagation()
+    playBleep()
     if (filterMode === 'normal') setFilterMode('ir_green')
     else if (filterMode === 'ir_green') setFilterMode('thermal')
     else setFilterMode('normal')
@@ -124,11 +128,16 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
   return (
     <div
       className="group relative aspect-video rounded-2xl overflow-hidden ring-1 ring-white/[0.08] hover:ring-cyan-400/50 transition-all cursor-pointer shadow-glass bg-[#0A0D14] transform-gpu will-change-transform"
-      onClick={() => !editing && onExpand?.(camera)}
+      onClick={() => {
+        if (!editing) {
+          playBleep()
+          onExpand?.(camera)
+        }
+      }}
     >
       {camera.streamUrl ? (
         <img
-          src={camera.streamUrl}
+          src={`${camera.streamUrl}${timestamp}`}
           alt={camera.location}
           style={imgFilterStyle}
           className="absolute inset-0 w-full h-full object-cover transform-gpu transition-all duration-300"

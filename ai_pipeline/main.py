@@ -16,7 +16,10 @@ from core.global_tracker import global_tracker
 from core.attribute_recognizer import AttributeRecognizer
 from core.auto_discovery import scanner
 from core.nvr_recorder import nvr_recorder
+from core.alpr_engine import ALPREngine
 from api.api_client import APIClient
+
+global_alpr = ALPREngine()
 
 DYNAMIC_CAMERAS = {}
 dynamic_analyzers = {}
@@ -66,6 +69,9 @@ app.add_middleware(
 
 class ThresholdSetting(BaseModel):
     threshold: float
+
+class PTZLimitSetting(BaseModel):
+    limit: float
 
 GLOBAL_WEAPON_THRESHOLD = settings.WEAPON_CONFIDENCE_THRESHOLD
 
@@ -317,20 +323,35 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
         else:
             cap = cv2.VideoCapture(camera_url, cv2.CAP_FFMPEG) if str(camera_url).startswith("rtsp") else cv2.VideoCapture(camera_url)
 
+        consecutive_failures = 0
+
         while True:
+            if not cap.isOpened():
+                print(f"[WARNING] Camera {camera_id} stream not open. Retrying connection in 2.0s...")
+                time.sleep(2.0)
+                if str(camera_url).isdigit():
+                    cap = cv2.VideoCapture(int(camera_url), cv2.CAP_DSHOW)
+                else:
+                    cap = cv2.VideoCapture(camera_url, cv2.CAP_FFMPEG) if str(camera_url).startswith("rtsp") else cv2.VideoCapture(camera_url)
+                continue
             if cap is not None and cap.isOpened():
                 ret, frame = cap.read()
                 if ret and frame is not None:
+                    consecutive_failures = 0
                     if raw_frame_queue.full():
                         try: raw_frame_queue.get_nowait()
                         except: pass
                     raw_frame_queue.put(frame)
                 else:
+                    consecutive_failures += 1
                     # Stream packet delay or frame boundary skip; brief sleep before retry
                     time.sleep(0.1)
-                    if cap is not None and not cap.isOpened():
-                        cap.release()
+                    if consecutive_failures > 15 or (cap is not None and not cap.isOpened()):
+                        print(f"[WARNING] Camera {camera_id} stream stalled. Reconnecting...")
+                        if cap is not None:
+                            cap.release()
                         time.sleep(0.5)
+                        consecutive_failures = 0
                         if str(camera_url).isdigit():
                             cap = cv2.VideoCapture(int(camera_url), cv2.CAP_DSHOW)
                         else:
@@ -369,26 +390,32 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
     if 'attr_recognizer' not in locals():
         attr_recognizer = AttributeRecognizer()
 
+    # Cold-start: wait longer for first RTSP I-frame which can take 2-5s on a physical camera
+    first_frame_received = False
+
     try:
         while True:
-            if not use_simulation:
-                try:
-                    frame = raw_frame_queue.get(timeout=1.5)
-                    last_valid_frame = frame.copy()
-                except queue.Empty:
-                    # If camera is buffering or I-frame is delayed, KEEP rendering last valid frame instead of throwing false CONNECTING black screen!
-                    if last_valid_frame is not None:
-                        frame = last_valid_frame.copy()
-                    elif str(camera_id) in LATEST_CAMERA_FRAMES:
-                        frame = LATEST_CAMERA_FRAMES[str(camera_id)].copy()
-                    else:
-                        # Only show placeholder on absolute first cold boot before first frame ever arrives
-                        empty_frame = np.zeros((360, 640, 3), dtype=np.uint8)
-                        cv2.putText(empty_frame, "ACQUIRING LIVE RTSP STREAM...", (110, 180), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 240, 255), 2)
-                        ret, buffer = cv2.imencode('.jpg', empty_frame, [cv2.IMWRITE_JPEG_QUALITY, 35])
-                        yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                        continue
+            try:
+                if not use_simulation:
+                    try:
+                        # Reverting back to original 1.5s timeout which worked perfectly on Tuesday
+                        frame = raw_frame_queue.get(timeout=1.5)
+                        last_valid_frame = frame.copy()
+                        first_frame_received = True
+                    except queue.Empty:
+                        # If camera is buffering or I-frame is delayed, KEEP rendering last valid frame instead of throwing false CONNECTING black screen!
+                        if last_valid_frame is not None:
+                            frame = last_valid_frame.copy()
+                        elif str(camera_id) in LATEST_CAMERA_FRAMES:
+                            frame = LATEST_CAMERA_FRAMES[str(camera_id)].copy()
+                        else:
+                            # Only show placeholder on absolute first cold boot before first frame ever arrives
+                            empty_frame = np.zeros((360, 640, 3), dtype=np.uint8)
+                            cv2.putText(empty_frame, "ACQUIRING LIVE RTSP STREAM...", (110, 180), 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 240, 255), 2)
+                            ret, buffer = cv2.imencode('.jpg', empty_frame, [cv2.IMWRITE_JPEG_QUALITY, 35])
+                            yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                            continue
                     
                 frame = enhance_low_light(frame)
                 
@@ -482,7 +509,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
 
                 # 2. Analyze Weapon Behavior & Draw
                 if weapon_results and len(weapon_results) > 0 and weapon_results[0].boxes is not None and len(weapon_results[0].boxes) > 0:
-                    weapon_alert = cam_analyzer.analyze_weapons(weapon_results, threshold=GLOBAL_WEAPON_THRESHOLD)
+                    weapon_alert = cam_analyzer.analyze_weapons(weapon_results, threshold=GLOBAL_WEAPON_THRESHOLD, person_boxes=boxes, scale=scale)
                     if weapon_alert and weapon_alert.get("is_new"):
                         res = api.send_alert(
                             camera_id=camera_id,
@@ -496,16 +523,16 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                             frame,
                             clip_url
                         )
-                    for wbox in weapon_results[0].boxes:
-                        if wbox.conf.item() > GLOBAL_WEAPON_THRESHOLD:
-                            wx1, wy1, wx2, wy2 = wbox.xyxy[0].cpu().numpy()
-                            # Scale weapon box if needed
-                            if 'scale' in locals() and scale < 1.0:
-                                wx1, wy1, wx2, wy2 = wx1/scale, wy1/scale, wx2/scale, wy2/scale
-                            wcls_id = int(wbox.cls.item())
-                            weapon_type = weapon_results[0].names[wcls_id].upper()
-                            cv2.rectangle(annotated_frame, (int(wx1), int(wy1)), (int(wx2), int(wy2)), (0, 0, 255), 4)
-                            cv2.putText(annotated_frame, f"WEAPON: {weapon_type}", (int(wx1), int(wy1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+                    if weapon_alert and weapon_alert.get("box") is not None:
+                        wbox = weapon_alert["box"]
+                        wx1, wy1, wx2, wy2 = wbox.xyxy[0].cpu().numpy()
+                        # Scale weapon box if needed
+                        if 'scale' in locals() and scale < 1.0:
+                            wx1, wy1, wx2, wy2 = wx1/scale, wy1/scale, wx2/scale, wy2/scale
+                        wcls_id = int(wbox.cls.item())
+                        weapon_type = weapon_results[0].names[wcls_id].upper()
+                        cv2.rectangle(annotated_frame, (int(wx1), int(wy1)), (int(wx2), int(wy2)), (0, 0, 255), 4)
+                        cv2.putText(annotated_frame, f"WEAPON: {weapon_type}", (int(wx1), int(wy1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
                 # 2b. Draw Vehicle Detections (Car, Van, SUV, Motorcycle, Bus, Truck, Bicycle)
                 v_boxes = last_draw_data.get('vehicle_boxes', [])
@@ -516,6 +543,26 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                 for v_box, v_cls, v_conf, v_id in zip(v_boxes, v_classes, v_confs, v_ids):
                     if v_conf >= 0.60:
                         v_type = attr_recognizer.classify_vehicle(v_cls, v_box)
+                        
+                        # --- Automatic License Plate Recognition (ALPR) ---
+                        plate_text = None
+                        if v_id is not None:
+                            plate_text = global_alpr.get_plate(v_id)
+                            if plate_text == "NOT_FOUND":
+                                plate_text = None
+                            elif not plate_text and not global_alpr.is_processing(v_id):
+                                # Crop vehicle ensuring bounds
+                                vx1, vy1, vx2, vy2 = [int(v) for v in v_box]
+                                h_f, w_f = frame.shape[:2]
+                                vx1, vy1 = max(0, vx1), max(0, vy1)
+                                vx2, vy2 = min(w_f, vx2), min(h_f, vy2)
+                                if vy2 > vy1 and vx2 > vx1:
+                                    v_crop = frame[vy1:vy2, vx1:vx2]
+                                    global_alpr.process_async(v_id, v_crop.copy())
+                        
+                        if plate_text:
+                            v_type = f"{v_type} | ALPR: {plate_text}"
+                            
                         attr_recognizer.draw_vehicle_badge(annotated_frame, v_box, v_type, track_id=v_id, conf=v_conf)
 
                 # 3. Analyze Human Behavior & Draw Bounding Boxes
@@ -545,9 +592,12 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                             current_person_ids.add(track_id)
                             current_person_boxes[track_id] = box
                             person_boxes.append(box)
-                            person_keypoints = all_keypoints[i] if all_keypoints is not None else None
+                            person_keypoints = all_keypoints[i] if (all_keypoints is not None and i < len(all_keypoints)) else None
                             # Pass current_zones to analyzer if needed, but for now we draw and alert below
-                            alert = cam_analyzer.analyze(track_id, box, person_keypoints, conf, zone_points=[], active_features=ACTIVE_FEATURES)
+                            try:
+                                alert = cam_analyzer.analyze(track_id, box, person_keypoints, conf, zone_points=[], active_features=ACTIVE_FEATURES)
+                            except Exception as _e:
+                                alert = None
                             
                             # Custom Restricted Zone Intrusion Detection
                             for z in current_zones:
@@ -569,8 +619,11 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                                     else: alert['details'] += f" | Intruding: {z.get('zone_label')}"
                             
                             # Detect Person Visual Attributes (Gender, Hair Style, Top Clothing Color) & Draw Cinematic HUD Badge
-                            attrs = attr_recognizer.detect_attributes(frame, box, person_keypoints, track_id=track_id)
-                            attr_recognizer.draw_attribute_badge(annotated_frame, box, attrs, track_id=track_id)
+                            try:
+                                attrs = attr_recognizer.detect_attributes(frame, box, person_keypoints, track_id=track_id)
+                                attr_recognizer.draw_attribute_badge(annotated_frame, box, attrs, track_id=track_id)
+                            except Exception as _e:
+                                pass
                             
                             # Automatically dispatch 'Person Detected' incident alert with smart enterprise throttling (once per 3 minutes per individual, 30s per camera zone) to maintain zero-spam, highly clean forensic logs
                             now_t = time.time()
@@ -581,14 +634,17 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                                 
                             last_alert_t = cam_analyzer._person_alert_timestamps.get(track_id, 0)
                             if (now_t - last_alert_t > 180.0) and (now_t - cam_analyzer._last_cam_person_time > 30.0):
-                                res = api.send_alert(
-                                    camera_id=camera_id,
-                                    behavior_type="Person Detected",
-                                    confidence=float(conf) if conf else 0.92,
-                                    details=f"Live AI surveillance monitored verified Person ID:{track_id} entering {camera_id} sector."
-                                )
-                                clip_url = res[0] if res else ""
-                                notifier.send_alert(f"ALERT: Person Detected on {camera_id}", annotated_frame, clip_url)
+                                try:
+                                    res = api.send_alert(
+                                        camera_id=camera_id,
+                                        behavior_type="Person Detected",
+                                        confidence=float(conf) if conf else 0.92,
+                                        details=f"Live AI surveillance monitored verified Person ID:{track_id} entering {camera_id} sector."
+                                    )
+                                    clip_url = res[0] if res else ""
+                                    notifier.send_alert(f"ALERT: Person Detected on {camera_id}", annotated_frame, clip_url)
+                                except Exception:
+                                    pass
                                 cam_analyzer._person_alert_timestamps[track_id] = now_t
                                 cam_analyzer._last_cam_person_time = now_t
 
@@ -737,234 +793,26 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                             cv2.rectangle(annotated_frame, (x, y), (x+w, y+h), color, 2)
                             cv2.putText(annotated_frame, f"{display_emotion} ({confidence:.2f})", 
                                         (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-            else:
-                # --- SIMULATION MODE ---
-                # 1. Create simulated base frame
-                frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-                # Draw grid lines
-                for y in range(0, 720, 80):
-                    cv2.line(frame, (0, y), (1280, y), (20, 20, 20), 1)
-                for x in range(0, 1280, 80):
-                    cv2.line(frame, (x, 0), (x, 720), (20, 20, 20), 1)
-
-                annotated_frame = frame.copy()
                 
-                # Display "SIMULATED FEED" warning indicator
-                cv2.putText(annotated_frame, "DEMO MODE: SIMULATED CCTV FEED", (380, 45), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (125, 211, 252), 2)
-                
-                # State calculations
-                sim_time = (time.time() - start_sim_time) % 45.0
-                
-                # Draw blinking simulation status
-                blink = int(time.time() * 2) % 2 == 0
-                if blink:
-                    cv2.circle(annotated_frame, (50, 40), 10, (0, 0, 255), -1)
-                    cv2.putText(annotated_frame, "REC", (75, 48), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+            except Exception as outer_err:
+                print(f"[{camera_id}] Pipeline Frame Processing Error Safeguard: {outer_err}")
+                if 'frame' in locals() and frame is not None:
+                    annotated_frame = frame.copy()
+                elif last_valid_frame is not None:
+                    annotated_frame = last_valid_frame.copy()
                 else:
-                    cv2.putText(annotated_frame, "REC", (75, 48), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (100, 100, 100), 2)
-                                
-                cv2.putText(annotated_frame, "ACTIVE MONITORING", (160, 48), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2)
+                    annotated_frame = np.zeros((360, 640, 3), dtype=np.uint8)
+                    cv2.putText(annotated_frame, "SURVEILLANCE STREAM RECOVERY...", (100, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 240, 255), 2)
                 
-                # Determine state and render content
-                if sim_time < 5.0:
-                    # State 0: Empty/Idle
-                    cv2.putText(annotated_frame, "STATUS: SECURE", (10, 100), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                    
-                    # Reset triggers for next cycle
-                    person_detected_alert_sent = False
-                    loitering_alert_sent = False
-                    emotion_alert_sent = False
-                    weapon_alert_sent = False
-                    fall_alert_sent = False
-                    
-                elif sim_time < 12.0:
-                    # State 1: Person Entered (walking from right to center)
-                    progress = (sim_time - 5.0) / 7.0 # 0.0 to 1.0
-                    cx = int(1280 - progress * 640) # Starts at 1280, moves to 640
-                    cy = 360
-                    w, h = 180, 400
-                    x1, y1 = cx - w//2, cy - h//2
-                    x2, y2 = cx + w//2, cy + h//2
-                    
-                    # Send alert
-                    if not person_detected_alert_sent:
-                        api.send_alert(
-                            camera_id="webcam_1",
-                            behavior_type="Person Detected",
-                            confidence=0.92,
-                            details="Person 101 entered the camera view."
-                        )
-                        person_detected_alert_sent = True
-                        
-                    # Draw Person Box
-                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 0, 0), 3)
-                    cv2.putText(annotated_frame, f"ID:101 Person 0.92", (x1, y1 - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
-                    
-                elif sim_time < 20.0:
-                    # State 2: Loitering (swaying in center)
-                    offset_x = int(10 * np.sin(time.time() * 2))
-                    cx = 640 + offset_x
-                    cy = 360
-                    w, h = 180, 400
-                    x1, y1 = cx - w//2, cy - h//2
-                    x2, y2 = cx + w//2, cy + h//2
-                    
-                    # Send alert after 3 seconds of loitering
-                    if sim_time >= 15.0 and not loitering_alert_sent:
-                        api.send_alert(
-                            camera_id="webcam_1",
-                            behavior_type="Loitering",
-                            confidence=0.85,
-                            details="Person 101 loitering for 3.0s"
-                        )
-                        loitering_alert_sent = True
-                        
-                    # Draw Person Box
-                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 0, 0), 3)
-                    cv2.putText(annotated_frame, f"ID:101 Person 0.92", (x1, y1 - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
-                    
-                    # Show loitering warning
-                    cv2.putText(annotated_frame, "ALERT: Loitering", (10, 100), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 191, 255), 2)
-                                
-                elif sim_time < 27.0:
-                    # State 3: Suspicious Emotion (Angry face)
-                    cx, cy = 640, 360
-                    w, h = 180, 400
-                    x1, y1 = cx - w//2, cy - h//2
-                    x2, y2 = cx + w//2, cy + h//2
-                    
-                    # Face box
-                    fx, fy, fw, fh = cx - 40, y1 + 20, 80, 80
-                    
-                    # Send alert
-                    if not emotion_alert_sent:
-                        api.send_alert(
-                            camera_id="webcam_1",
-                            behavior_type="Suspicious Emotion",
-                            confidence=0.87,
-                            details="High stress emotion detected: ANGRY (87%)"
-                        )
-                        emotion_alert_sent = True
-                        
-                    # Draw Person & Face Box
-                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 0, 0), 3)
-                    cv2.putText(annotated_frame, f"ID:101 Person 0.92", (x1, y1 - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
-                                
-                    cv2.rectangle(annotated_frame, (fx, fy), (fx+fw, fy+fh), (0, 165, 255), 2)
-                    cv2.putText(annotated_frame, "Angry (0.87)", (fx, fy - 8), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
-                                
-                    # Show emotion warning
-                    cv2.putText(annotated_frame, "CRITICAL: Suspicious Emotion", (10, 100), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 2)
-                                
-                elif sim_time < 35.0:
-                    # State 4: Weapon Detected (Pistol)
-                    cx, cy = 640, 360
-                    w, h = 180, 400
-                    x1, y1 = cx - w//2, cy - h//2
-                    x2, y2 = cx + w//2, cy + h//2
-                    
-                    # Hand/Weapon box
-                    wx, wy, ww, wh = cx + 50, cy - 20, 70, 70
-                    
-                    # Send alert
-                    if not weapon_alert_sent:
-                        api.send_alert(
-                            camera_id="webcam_1",
-                            behavior_type="Pistol Detected",
-                            confidence=0.94,
-                            details="Pistol detected with 94.0% confidence!"
-                        )
-                        weapon_alert_sent = True
-                        
-                    # Draw Person & Weapon Box
-                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 0, 0), 3)
-                    cv2.putText(annotated_frame, f"ID:101 Person 0.92", (x1, y1 - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
-                                
-                    cv2.rectangle(annotated_frame, (wx, wy), (wx+ww, wy+wh), (0, 0, 255), 4)
-                    cv2.putText(annotated_frame, "PISTOL", (wx, wy - 8), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-                                
-                    # Show weapon warning
-                    cv2.putText(annotated_frame, "CRITICAL: Pistol Detected", (10, 100), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
-                                
-                elif sim_time < 41.0:
-                    # State 5: Fall Detected (Box is wide and on the floor)
-                    cx, cy = 640, 580
-                    w, h = 400, 180
-                    x1, y1 = cx - w//2, cy - h//2
-                    x2, y2 = cx + w//2, cy + h//2
-                    
-                    # Send alert
-                    if not fall_alert_sent:
-                        api.send_alert(
-                            camera_id="webcam_1",
-                            behavior_type="Falling Detected",
-                            confidence=0.90,
-                            details="Person 101 has fallen down!"
-                        )
-                        fall_alert_sent = True
-                        
-                    # Draw fallen Person Box
-                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
-                    cv2.putText(annotated_frame, f"ID:101 Person 0.90", (x1, y1 - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-                                
-                    # Show fall warning
-                    cv2.putText(annotated_frame, "ALERT: Falling Detected", (10, 100), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 0, 255), 2)
-                                
-                else:
-                    # State 6: Person Leaves (exiting to left)
-                    progress = (sim_time - 41.0) / 4.0 # 0.0 to 1.0
-                    cx = int(640 - progress * 800) # Starts at 640, moves off screen
-                    cy = 360
-                    w, h = 180, 400
-                    x1, y1 = cx - w//2, cy - h//2
-                    x2, y2 = cx + w//2, cy + h//2
-                    
-                    if cx > -w:
-                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 0, 0), 3)
-                        cv2.putText(annotated_frame, f"ID:101 Person 0.92", (x1, y1 - 10), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
-                                    
-                time.sleep(0.04)
-
-            import datetime
-            # --- SYSTEM TIME SYNC OVERLAY ---
-            # Mask the incorrect hardware camera OSD timestamp at the top left
-            overlay = annotated_frame.copy()
-            cv2.rectangle(overlay, (0, 0), (700, 70), (10, 13, 20), -1)
-            cv2.addWeighted(overlay, 0.95, annotated_frame, 0.05, 0, annotated_frame)
-            
-            # Draw real-time synchronized system clock
-            current_time_str = datetime.datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
-            cv2.putText(annotated_frame, f"AETHRA SYS-TIME: {current_time_str}", (15, 45), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (200, 255, 255), 3)
-
             # Feed frame into continuous NVR circular ring buffer for forensic incident clip extraction
             nvr_recorder.add_frame(camera_id, annotated_frame)
             LATEST_CAMERA_FRAMES[str(camera_id)] = annotated_frame.copy()
 
             # Encode the frame at high quality (85) for clear streaming
             ret, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            frame_bytes = buffer.tobytes()
             
             # Yield the output frame in the byte format
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
     finally:
         pass
 

@@ -1,5 +1,6 @@
 import React from 'react'
 import { LayoutGrid, Camera, ShieldAlert, ChartNoAxesCombined, ScanLine, Settings2, Clapperboard, UserCheck, Users } from 'lucide-react'
+import { playBleep } from '../utils/sounds.js'
 
 const NAV = [
   { key: 'grid', icon: LayoutGrid, label: 'Live Video Dashboard' },
@@ -21,7 +22,10 @@ export default function Sidebar({ activeTab = 'grid', onTabChange, userRole = 'a
         return (
           <button
             key={item.key}
-            onClick={() => onTabChange?.(item.key)}
+            onClick={() => {
+              playBleep();
+              onTabChange?.(item.key);
+            }}
             className={`group relative h-11 w-11 grid place-items-center rounded-xl transition-all focus-ring ${
               isActive
                 ? 'bg-cyan-glow/15 ring-1 ring-cyan-glow/50 text-cyan-glow shadow-[0_0_15px_rgba(0,255,255,0.25)] font-bold'

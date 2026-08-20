@@ -17,6 +17,10 @@ class PTZController:
         self.last_track_time = time.time()
         self.has_moved = False
         
+        # Software-based rotation tracker to prevent blind spots
+        self.accumulated_pan = 0.0
+        self.pan_limit_degrees = 360
+        
         self._command_thread = threading.Thread(target=self._process_commands, daemon=True)
         self._command_thread.start()
 
@@ -79,6 +83,7 @@ class PTZController:
                         requests.put(home_url, auth=HTTPDigestAuth(self.user, self.password), timeout=2)
                         self.has_moved = False
                         last_pan, last_tilt = 0, 0
+                        self.accumulated_pan = 0.0  # Reset rotation tracker
                     except Exception as e:
                         pass
                 
@@ -95,6 +100,19 @@ class PTZController:
                 self._send_ptz(pan, tilt)
                 last_pan, last_tilt = pan, tilt
             else:
+                # Estimate angle change: Speed 100 is approx 60 degrees/sec. Burst is 0.35s.
+                angle_change = pan * 0.6 * 0.35
+                
+                # Prevent moving further in this direction if limit exceeded
+                if abs(self.accumulated_pan + angle_change) > self.pan_limit_degrees:
+                    # Clear command queue to drop this tracking frame
+                    while not self.command_queue.empty():
+                        try: self.command_queue.get_nowait()
+                        except: pass
+                    continue
+                    
+                self.accumulated_pan += angle_change
+                
                 # AI Burst Tracking (Step-and-Wait) to prevent ping-pong oscillation from RTSP delay!
                 self._send_ptz(pan, tilt)
                 time.sleep(0.35) # Move duration burst
@@ -148,9 +166,11 @@ class PTZController:
 
     def set_home(self):
         self.last_manual_command_time = time.time()
-        url = f"http://{self.ip}:{self.port}/ISAPI/PTZCtrl/channels/1/presets/1"
+        self.has_moved = False
+        self.accumulated_pan = 0.0
+        home_url = f"http://{self.ip}:{self.port}/ISAPI/PTZCtrl/channels/1/presets/1/goto"
         try:
-            requests.put(url, auth=HTTPDigestAuth(self.user, self.password), timeout=2)
+            requests.put(home_url, auth=HTTPDigestAuth(self.user, self.password), timeout=2)
         except Exception as e:
             pass
 

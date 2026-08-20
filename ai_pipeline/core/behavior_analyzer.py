@@ -13,6 +13,7 @@ class BehaviorAnalyzer:
         # Weapon state
         self.weapon_alerted = False
         self.last_weapon_alert_time = 0
+        self.weapon_consecutive_frames = 0
         
         # Emotion state
         self.emotion_alerted = False
@@ -170,39 +171,74 @@ class BehaviorAnalyzer:
         
         return None
 
-    def analyze_weapons(self, weapon_results, threshold=0.65):
+    def analyze_weapons(self, weapon_results, threshold=0.65, person_boxes=None, scale=1.0):
         current_time = time.time()
         
         # Check if weapon model detected anything
         if not weapon_results or len(weapon_results) == 0:
+            self.weapon_consecutive_frames = 0
             return None
             
         boxes = weapon_results[0].boxes
         if boxes is None or len(boxes) == 0:
+            self.weapon_consecutive_frames = 0
             # No weapons detected. Reset alert after 5 seconds of clear frame
             if current_time - self.last_weapon_alert_time > 5.0:
                 self.weapon_alerted = False
             return None
             
         # Iterate over detections
+        highest_conf_box = None
         for box in boxes:
-            conf = box.conf.item()
-            # Usually class 0 or 1 in weapon models represents a weapon (pistol/knife)
-            # Dynamic threshold
-            if conf > threshold:
-                cls_id = int(box.cls.item())
-                weapon_type = weapon_results[0].names[cls_id].capitalize()
-                
-                is_new = not self.weapon_alerted
-                self.weapon_alerted = True
-                self.last_weapon_alert_time = current_time
-                
-                return {
-                    "behavior": f"{weapon_type} Detected",
-                    "confidence": float(conf),
-                    "details": f"{weapon_type} detected with {conf*100:.1f}% confidence!",
-                    "is_new": is_new
-                }
+            if box.conf.item() > threshold:
+                # Spatial Verification: If person_boxes are available, ensure weapon overlaps with a person!
+                is_valid = True
+                if person_boxes is not None and len(person_boxes) > 0:
+                    is_valid = False
+                    wx1, wy1, wx2, wy2 = box.xyxy[0].cpu().numpy()
+                    wx1, wy1, wx2, wy2 = wx1/scale, wy1/scale, wx2/scale, wy2/scale
+                    
+                    for pbox in person_boxes:
+                        px1, py1, px2, py2 = pbox
+                        # Add 40% padding to person box to account for outstretched arms holding a weapon
+                        padding_x = (px2 - px1) * 0.4
+                        padding_y = (py2 - py1) * 0.4
+                        px1, py1 = px1 - padding_x, py1 - padding_y
+                        px2, py2 = px2 + padding_x, py2 + padding_y
+                        
+                        # Check bounding box intersection
+                        if not (wx2 < px1 or wx1 > px2 or wy2 < py1 or wy1 > py2):
+                            is_valid = True
+                            break
+                            
+                if is_valid:
+                    highest_conf_box = box
+                    break
+                    
+        if highest_conf_box is None:
+            self.weapon_consecutive_frames = 0
+            return None
+            
+        self.weapon_consecutive_frames += 1
+        
+        # Require 3 consecutive YOLO passes detecting a weapon to eliminate split-second false positives
+        if self.weapon_consecutive_frames < 3:
+            return None
+            
+        cls_id = int(highest_conf_box.cls.item())
+        weapon_type = weapon_results[0].names[cls_id].capitalize()
+        
+        is_new = not self.weapon_alerted
+        self.weapon_alerted = True
+        self.last_weapon_alert_time = current_time
+        
+        return {
+            "behavior": f"{weapon_type} Detected",
+            "confidence": float(highest_conf_box.conf.item()),
+            "details": f"Lethal threat identified: {weapon_type} (Conf: {highest_conf_box.conf.item()*100:.1f}%)",
+            "is_new": is_new,
+            "box": highest_conf_box
+        }
         return None
 
     def analyze_emotion(self, dominant_emotion, confidence):
@@ -344,3 +380,14 @@ class BehaviorAnalyzer:
                     self.unattended_history.pop(obj_key, None)
 
         return None
+
+    def update_crowd_density(self, person_count: int):
+        """Track crowd density over time for statistics and alerts."""
+        current_time = time.time()
+        self.current_person_count = person_count
+        if not hasattr(self, 'crowd_density_history'):
+            self.crowd_density_history = []
+        self.crowd_density_history.append((current_time, person_count))
+        # Keep only last 60 seconds of history
+        cutoff = current_time - 60.0
+        self.crowd_density_history = [(t, c) for t, c in self.crowd_density_history if t > cutoff]

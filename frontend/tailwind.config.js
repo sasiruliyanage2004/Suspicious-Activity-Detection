@@ -39,6 +39,10 @@ export default {
         xs: '2px',
       },
       keyframes: {
+        marquee: {
+          '0%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
         'pulse-glow': {
           '0%, 100%': { opacity: '1', boxShadow: '0 0 0 0 rgba(255,0,60,0.55)' },
           '50%': { opacity: '0.85', boxShadow: '0 0 0 8px rgba(255,0,60,0)' },
@@ -61,6 +65,7 @@ export default {
         },
       },
       animation: {
+        marquee: 'marquee 20s linear infinite',
         'pulse-glow': 'pulse-glow 2.2s ease-in-out infinite',
         'pulse-dot': 'pulse-dot 1.8s ease-in-out infinite',
         'scan': 'scan 4s linear infinite',

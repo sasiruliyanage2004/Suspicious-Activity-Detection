@@ -24,6 +24,17 @@ export default function NodeSettingsView({ sensitivity, onSensitivityChange }) {
   const [retentionDays, setRetentionDays] = useState('30')
   const [showDualControl, setShowDualControl] = useState(false)
   const [purgeSuccess, setPurgeSuccess] = useState(false)
+  const [ptzLimit, setPtzLimit] = useState(360)
+
+  const handlePtzLimitChange = (e) => {
+    const val = parseInt(e.target.value)
+    setPtzLimit(val)
+    fetch('http://127.0.0.1:8002/api/settings/ptz_limit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ limit: val })
+    }).catch(() => {})
+  }
 
   useEffect(() => {
     fetch('/aethra.license.json')
@@ -169,11 +180,30 @@ export default function NodeSettingsView({ sensitivity, onSensitivityChange }) {
           <div className="glass-panel rounded-2xl p-6 border border-white/10 space-y-4 shadow-[0_0_25px_rgba(0,0,0,0.4)]">
             <h2 className="font-display text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-white/10 pb-3">
               <Sliders size={16} className="text-cyan-glow" />
-              Real-Time Alert Webhooks
+              Camera &amp; Alert Controls
             </h2>
 
             <div className="space-y-4 font-mono text-xs">
-
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-gray-400 font-bold text-[11px] uppercase">
+                  <span>PTZ Auto-Tracking Max Rotation</span>
+                  <span className="text-cyan-400">{ptzLimit}&deg;</span>
+                </div>
+                <div className="flex items-center gap-4 bg-black/60 border border-white/15 rounded-xl p-3 shadow-inner">
+                  <span className="text-gray-500 font-bold">10&deg;</span>
+                  <input 
+                    type="range" 
+                    min="10" max="360" step="10"
+                    value={ptzLimit} 
+                    onChange={handlePtzLimitChange}
+                    className="w-full accent-cyan-400 cursor-pointer"
+                  />
+                  <span className="text-gray-500 font-bold">360&deg;</span>
+                </div>
+                <p className="text-[10px] text-gray-500 font-sans">
+                  Restricts camera rotation during auto-tracking to prevent blind spots and cable snags.
+                </p>
+              </div>
 
               <div className="border-t border-white/10 pt-3.5 space-y-2">
                 <span className="text-gray-400 font-bold text-[11px] uppercase block">Telegram Real-Time Alert Webhook</span>
