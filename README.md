@@ -7,7 +7,7 @@
     <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python Version">
     <img src="https://img.shields.io/badge/React-18-61DAFB.svg?logo=react" alt="React">
     <img src="https://img.shields.io/badge/FastAPI-005571?style=flat&amp;logo=fastapi" alt="FastAPI">
-    <img src="https://img.shields.io/badge/YOLOv8-Ultralytics-orange.svg" alt="YOLOv8">
+    <img src="https://img.shields.io/badge/YOLOv11-Ultralytics-orange.svg" alt="YOLOv8">
     <img src="https://img.shields.io/badge/OpenCV-5C3EE8.svg?logo=opencv" alt="OpenCV">
   </p>
 </div>
