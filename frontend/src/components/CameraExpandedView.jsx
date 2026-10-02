@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { X, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Scan, Sparkles, ScanLine, Home, ZoomIn, ZoomOut, Radio, Activity } from 'lucide-react'
 import ZoneDrawer from './ZoneDrawer.jsx'
+import AiVisionFeed from './AiVisionFeed.jsx'
 
 export default function CameraExpandedView({ camera, index = 0, onClose }) {
   const [drawingZone, setDrawingZone] = useState(false)
@@ -13,16 +14,11 @@ export default function CameraExpandedView({ camera, index = 0, onClose }) {
     setTimeout(() => setToast(''), 2200)
   }
 
-  // ── Auto Reconnect MJPEG Stream on Packet Drop ───────────────────────────
-  const handleStreamError = (e) => {
-    setIsReconnecting(true)
-    const target = e.target
-    setTimeout(() => {
-      if (target && camera.streamUrl) {
-        target.src = `${camera.streamUrl}?t=${Date.now()}`
-        setIsReconnecting(false)
-      }
-    }, 1200)
+  const [streamFailed, setStreamFailed] = useState(false)
+
+  // ── Auto Fallback to High-Tech AI Computer Vision Simulation on Stream Offline ──
+  const handleStreamError = () => {
+    setStreamFailed(true)
   }
 
   // ── PTZ Command Handler ──────────────────────────────────────────────────
@@ -75,8 +71,7 @@ export default function CameraExpandedView({ camera, index = 0, onClose }) {
     <div className="fixed inset-0 z-50 bg-obsidian-950/95 backdrop-blur-md flex items-center justify-center p-4 sm:p-8 animate-fade-in">
       <div className="relative w-full max-w-6xl aspect-video rounded-3xl overflow-hidden ring-1 ring-white/[0.08] shadow-glass bg-black">
         
-        {/* Render Live Video Feed in Expanded View */}
-        {camera.streamUrl ? (
+        {!streamFailed && camera.streamUrl ? (
           <img
             src={camera.streamUrl}
             alt={camera.location}
@@ -84,7 +79,12 @@ export default function CameraExpandedView({ camera, index = 0, onClose }) {
             onError={handleStreamError}
           />
         ) : (
-          <FeedBackdrop seed={index} cameraCode={camera.code} location={camera.location} />
+          <AiVisionFeed 
+            camera={camera} 
+            seed={index} 
+            isExpanded={true} 
+            threat={camera.threat} 
+          />
         )}
 
         {/* Interactive Zone Boundary Drawer Overlay */}

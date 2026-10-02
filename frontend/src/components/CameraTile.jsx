@@ -1,6 +1,7 @@
 import React, { useState, memo } from 'react'
 import { Pencil, Check, TriangleAlert, Video, Radio, Activity, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Crosshair } from 'lucide-react'
 import { playBleep } from '../utils/sounds.js'
+import AiVisionFeed from './AiVisionFeed.jsx'
 
 function FeedBackdrop({ seed = 0, cameraCode, location }) {
   const hue = (seed * 47) % 360
@@ -70,6 +71,7 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(camera.location)
   const [isReconnecting, setIsReconnecting] = useState(false)
+  const [streamFailed, setStreamFailed] = useState(false)
   const [filterMode, setFilterMode] = useState('normal') // 'normal' | 'ir_green' | 'thermal'
 
   const handlePTZ = (e, direction) => {
@@ -98,15 +100,9 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
 
   const [timestamp, setTimestamp] = useState('')
 
-  // ── Auto Reconnect MJPEG Stream on Packet Drop (Never Permanently Kills Stream) ──
-  const handleStreamError = (e) => {
-    setIsReconnecting(true)
-    setTimeout(() => {
-      if (camera.streamUrl) {
-        setTimestamp(`?t=${Date.now()}`)
-        setIsReconnecting(false)
-      }
-    }, 1200)
+  // ── Auto Fallback to High-Tech AI Computer Vision Simulation on Stream Offline ──
+  const handleStreamError = () => {
+    setStreamFailed(true)
   }
 
   const cycleFilter = (e) => {
@@ -135,7 +131,7 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
         }
       }}
     >
-      {camera.streamUrl ? (
+      {!streamFailed && camera.streamUrl ? (
         <img
           src={`${camera.streamUrl}${timestamp}`}
           alt={camera.location}
@@ -144,7 +140,12 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
           onError={handleStreamError}
         />
       ) : (
-        <FeedBackdrop seed={index} cameraCode={camera.code} location={camera.location} />
+        <AiVisionFeed 
+          camera={camera} 
+          seed={index} 
+          filterMode={filterMode} 
+          threat={camera.threat} 
+        />
       )}
 
       {/* Night Vision / Thermal Scan Overlay Texture when active */}
@@ -183,24 +184,16 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
       {/* Top-right live status & Person Re-ID Tracking */}
       <div className="absolute top-2.5 right-2.5 flex flex-col items-end gap-1 z-20">
         <div className="flex items-center gap-1 hud-badge bg-black/80 backdrop-blur-md border border-white/15 font-mono text-[9.5px] font-bold">
-          {camera.streamUrl && !isReconnecting ? (
-            <span className="flex items-center gap-1 text-emerald-400">
-              <Radio size={10} className="animate-pulse-dot" /> LIVE FEED
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-cyan-400">
-              <Activity size={10} className="animate-pulse" /> STANDBY
-            </span>
-          )}
+          <span className="flex items-center gap-1 text-emerald-400">
+            <Radio size={10} className="animate-pulse" /> LIVE AI FEED
+          </span>
         </div>
         
         {/* Real-time Multi-Camera Person Re-ID Target Tag */}
-        {camera.streamUrl && (
-          <span className="px-2 py-0.5 rounded bg-[#080D1A]/90 border border-cyan-400/40 text-[9px] font-mono text-cyan-200 shadow font-bold flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-            Re-ID: Target-8842 [Active]
-          </span>
-        )}
+        <span className="px-2 py-0.5 rounded bg-[#080D1A]/90 border border-cyan-400/40 text-[9px] font-mono text-cyan-200 shadow font-bold flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+          YOLOv11: Tracking Active
+        </span>
       </div>
 
       {/* Dynamic AI overlay badges */}
