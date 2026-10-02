@@ -2,15 +2,18 @@
 
 export const IS_SECURE_CLOUD = typeof window !== 'undefined' && window.location.protocol === 'https:' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
 
-// Determine Base URLs (supports Cloud environment variables with local fallbacks)
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
-export const AI_URL = import.meta.env.VITE_AI_URL || 'http://127.0.0.1:8002';
+// Live Render Cloud Backend Endpoint
+export const PRODUCTION_RENDER_BACKEND = 'https://aethra-vision-backend.onrender.com';
+
+// Determine Base URLs (auto-points to Render backend in cloud, or localhost when developing locally)
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (IS_SECURE_CLOUD ? PRODUCTION_RENDER_BACKEND : 'http://127.0.0.1:8000');
+export const AI_URL = import.meta.env.VITE_AI_URL || (IS_SECURE_CLOUD ? PRODUCTION_RENDER_BACKEND : 'http://127.0.0.1:8002');
 
 export const getWsUrl = () => {
   if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
   if (IS_SECURE_CLOUD) {
-    // In HTTPS cloud environment without a custom WSS backend configured, return null to avoid mixed-content security blocks
-    return null;
+    // In HTTPS cloud environment, connect to secure Render WebSocket
+    return 'wss://aethra-vision-backend.onrender.com/ws/alerts';
   }
   return 'ws://127.0.0.1:8000/ws/alerts';
 };
