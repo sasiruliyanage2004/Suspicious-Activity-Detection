@@ -94,7 +94,7 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-obsidian-950/70 border-b border-white/[0.05]">
-      <div className="max-w-[1600px] mx-auto px-5 sm:px-7 h-16 flex items-center justify-between gap-4">
+      <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Emblem + name */}
         <div className="flex items-center gap-2.5 shrink-0">
           <ShieldEmblem />

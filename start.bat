@@ -1,18 +1,39 @@
 @echo off
-echo Starting CCTV AI Security System...
+title Aethra Vision Core - Tactical Command Center
+echo ===================================================================
+echo       STARTING AETHRA VISION CORE (AI PIPELINE + BACKEND + FRONTEND)
+echo ===================================================================
 
-echo Starting Backend API...
-start "Backend" cmd /k "cd /d "%~dp0backend" && "..\.venv\Scripts\python.exe" -m uvicorn main:app --reload"
+set "ROOT=%~dp0"
+set "PYTHON=%ROOT%.venv\Scripts\python.exe"
 
-echo Starting AI Camera Pipeline...
-start "AI Pipeline" cmd /k "cd /d "%~dp0ai_pipeline" && "..\.venv\Scripts\python.exe" -m uvicorn main:app --port 8002"
+if not exist "%PYTHON%" (
+    set "PYTHON=python"
+)
 
-echo Starting React Dashboard...
-start "Frontend" cmd /k "cd /d "%~dp0frontend" && npm run dev"
+echo [1/3] Launching FastAPI Backend on Port 8000...
+start "Aethra Backend (Port 8000)" cmd /k "cd /d "%ROOT%backend" && "%PYTHON%" main.py"
 
-echo All services started!
-echo Please wait a few seconds for AI models & RTSP hardware to initialize...
-timeout /t 8
+echo [2/3] Launching AI Detection Pipeline on Port 8002...
+start "Aethra AI Pipeline (Port 8002)" cmd /k "cd /d "%ROOT%ai_pipeline" && "%PYTHON%" main.py"
 
-echo Opening Dashboard in browser...
+echo [3/3] Launching React Dashboard on Port 5050...
+start "Aethra Frontend (Port 5050)" cmd /k "cd /d "%ROOT%frontend" && npm run dev"
+
+echo.
+echo All services are launching in their respective windows!
+echo Initializing AI models and connecting camera streams...
+timeout /t 5 >nul
+
+echo.
+echo Opening Command Center Dashboard in browser: http://localhost:5050/
 start http://localhost:5050/
+
+echo.
+echo ===================================================================
+echo System is running!
+echo Admin Login:    liyanagesasiru@gmail.com  /  admin123  (OTP: 892014)
+echo Operator Login: SEC-OP-1024-A             /  PIN: 1234
+echo ===================================================================
+echo.
+pause

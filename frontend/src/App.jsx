@@ -250,7 +250,7 @@ export default function App() {
         }}
       />
 
-      <div className="flex-1 max-w-[1600px] w-full mx-auto flex">
+      <div className="flex-1 w-full flex">
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} userRole={activeUser?.role} />
         
         {/* Render Active View dynamically */}

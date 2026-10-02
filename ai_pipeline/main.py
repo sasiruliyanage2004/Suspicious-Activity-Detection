@@ -415,6 +415,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 240, 255), 2)
                             ret, buffer = cv2.imencode('.jpg', empty_frame, [cv2.IMWRITE_JPEG_QUALITY, 35])
                             yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                            time.sleep(0.1)
                             continue
                     
                 frame = enhance_low_light(frame)
@@ -1128,3 +1129,8 @@ def video_feed(cam_id: str):
             generate_frames(info["url"], info["name"], ptz_cam1, cam_analyzer=dynamic_analyzers[cid], cam_detector=dynamic_detectors[cid], enable_emotion=False),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8002, reload=False)
+

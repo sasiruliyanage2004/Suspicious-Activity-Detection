@@ -36,6 +36,42 @@ try:
 except Exception:
     pass
 
+# Auto-seed default operators and admin if tables are empty
+try:
+    with Session(engine) as db_session:
+        from db.models import Operator as OpModel, User as UserModel
+        if not db_session.query(OpModel).first():
+            db_session.add_all([
+                OpModel(
+                    badge_id="SEC-OP-1024-A",
+                    pin="1234",
+                    name="Nimal Silva",
+                    nic="198512345678",
+                    shift="Morning Shift (06:00 - 14:00)",
+                    role="Senior Surveillance Operator",
+                    is_active=1
+                ),
+                OpModel(
+                    badge_id="SEC-OP-9842-B",
+                    pin="5678",
+                    name="Sunethra Perera",
+                    nic="199087654321",
+                    shift="Night Shift (22:00 - 06:00)",
+                    role="Control Room Specialist",
+                    is_active=1
+                )
+            ])
+            db_session.commit()
+            print("[DB] Initialized default security operators.")
+
+        if not db_session.query(UserModel).filter(UserModel.username == "liyanagesasiru@gmail.com").first():
+            admin_pwd = pwd_context.hash("admin123")
+            db_session.add(UserModel(username="liyanagesasiru@gmail.com", hashed_password=admin_pwd))
+            db_session.commit()
+            print("[DB] Initialized default admin user.")
+except Exception as e:
+    print(f"[DB] Note on initialization: {e}")
+
 vault_dir = os.path.join(os.path.dirname(__file__), "recordings_vault")
 os.makedirs(vault_dir, exist_ok=True)
 
@@ -209,3 +245,8 @@ def capture_live_face(camera_id: str):
         return {"status": "success", "image_url": f"data:image/jpeg;base64,{b64_str}"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+
