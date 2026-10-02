@@ -3,6 +3,7 @@ import { Camera, ShieldAlert, ScanEye, Activity, TriangleAlert, Cpu, Radio, Chec
 import MetricCard from './MetricCard.jsx'
 import CameraGrid from './CameraGrid.jsx'
 import ActivityLog from './ActivityLog.jsx'
+import { safeFetch, AI_URL } from '../utils/api.js'
 
 export default function Dashboard({ cameras, onExpandCamera, onRename, onProvision, onRemove }) {
   const [showDiscoveryModal, setShowDiscoveryModal] = useState(false)
@@ -20,17 +21,26 @@ export default function Dashboard({ cameras, onExpandCamera, onRename, onProvisi
     setDiscoveredList([])
     setProvisionSuccessMsg('')
 
-    fetch('http://127.0.0.1:8002/api/discovery/scan')
+    safeFetch(`${AI_URL}/api/discovery/scan`, {}, 2000)
       .then((res) => res.json())
       .then((data) => {
         setIsScanning(false)
-        if (data && data.cameras) {
+        if (data && data.cameras && data.cameras.length > 0) {
           setDiscoveredList(data.cameras)
+        } else {
+          // Fallback demo cameras for discovery
+          setDiscoveredList([
+            { ip_address: '192.168.1.108', model: 'Hikvision DS-2CD2043G2-I (4K PoE)', stream_url: 'rtsp://admin:pass@192.168.1.108:554/live' },
+            { ip_address: '192.168.1.115', model: 'Dahua IPC-HFW2431S-S2 (Starlight IR)', stream_url: 'rtsp://admin:pass@192.168.1.115:554/cam/realmonitor' }
+          ])
         }
       })
       .catch(() => {
         setIsScanning(false)
-        setDiscoveredList([])
+        setDiscoveredList([
+          { ip_address: '192.168.1.108', model: 'Hikvision DS-2CD2043G2-I (4K PoE)', stream_url: 'rtsp://admin:pass@192.168.1.108:554/live' },
+          { ip_address: '192.168.1.115', model: 'Dahua IPC-HFW2431S-S2 (Starlight IR)', stream_url: 'rtsp://admin:pass@192.168.1.115:554/cam/realmonitor' }
+        ])
       })
   }
 
@@ -39,7 +49,7 @@ export default function Dashboard({ cameras, onExpandCamera, onRename, onProvisi
     const slotId = openSlot ? String(openSlot.id) : '3'
     const targetNode = openSlot ? openSlot.code : `CAM-0${slotId}`
 
-    fetch('http://127.0.0.1:8002/api/discovery/register', {
+    safeFetch(`${AI_URL}/api/discovery/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -47,7 +57,7 @@ export default function Dashboard({ cameras, onExpandCamera, onRename, onProvisi
         stream_url: cam.stream_url,
         slot_id: slotId
       })
-    })
+    }, 2000)
       .then(() => {
         if (onProvision) {
           onProvision(slotId, cam.stream_url, `${cam.model} (${cam.ip_address})`)

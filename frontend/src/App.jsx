@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { speechSiren } from './utils/speechSiren.js'
+import { safeFetch, BACKEND_URL, AI_URL, getWsUrl } from './utils/api.js'
 import SplashScreen from './components/SplashScreen.jsx'
 import Ticker from './components/Ticker.jsx'
 import AuthScreen from './components/AuthScreen.jsx'
@@ -87,10 +88,10 @@ export default function App() {
   const handleRemoveCamera = (id) => {
     const slotNum = Number(id)
     
-    // Call the unregister endpoint on the AI Pipeline backend to stop tracking and alert admin
-    fetch(`http://127.0.0.1:8002/api/discovery/unregister/CAM-0${slotNum}`, {
+    // Call the unregister endpoint with safeFetch and short timeout
+    safeFetch(`${AI_URL}/api/discovery/unregister/CAM-0${slotNum}`, {
       method: 'POST'
-    }).catch((e) => console.error("Failed to unregister camera backend:", e))
+    }, 2000).catch(() => {})
 
     const updated = cameras.map((c) => {
       if (c.id === slotNum) {
@@ -106,18 +107,25 @@ export default function App() {
     setAuthenticated(true)
   }
 
-  // Global WebSocket listener for Threat Alerts (Siren & Dashboard updates)
+  // Global WebSocket listener for Threat Alerts (Siren & Dashboard updates) with resilient backoff
   useEffect(() => {
     if (!authenticated) return;
     
+    const wsUrl = getWsUrl();
+    if (!wsUrl) return; // In secure cloud without WSS proxy, avoid mixed-content blocks
+
     let ws = null;
     let reconnectTimeout = null;
+    let failureCount = 0;
+    let isDisposed = false;
 
     const connectWS = () => {
+      if (isDisposed) return;
       try {
-        ws = new WebSocket('ws://127.0.0.1:8000/ws/alerts');
+        ws = new WebSocket(wsUrl);
         
         ws.onopen = () => {
+          failureCount = 0;
           console.log('Threat Alerts WebSocket Connected');
         };
 
@@ -151,11 +159,15 @@ export default function App() {
         };
 
         ws.onclose = () => {
-          reconnectTimeout = setTimeout(connectWS, 2000);
+          if (isDisposed) return;
+          failureCount++;
+          // Progressive backoff: 5s, 10s, 20s, up to max 45s
+          const delay = Math.min(45000, failureCount * 5000);
+          reconnectTimeout = setTimeout(connectWS, delay);
         };
         
         ws.onerror = () => {
-          ws.close();
+          if (ws) ws.close();
         };
       } catch (err) {}
     };
@@ -163,6 +175,7 @@ export default function App() {
     connectWS();
     
     return () => {
+      isDisposed = true;
       if (ws) ws.close();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     }
@@ -181,11 +194,11 @@ export default function App() {
 
     const interval = setInterval(() => {
       if (activityCount > 0) {
-        fetch(`http://127.0.0.1:8000/api/operators/${activeUser.badgeId}/heartbeat`, {
+        safeFetch(`${BACKEND_URL}/api/operators/${activeUser.badgeId}/heartbeat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ activity_count: activityCount })
-        }).catch(() => {});
+        }, 2000).catch(() => {});
         activityCount = 0; // reset after sending
       }
     }, 15000); // Send heartbeat every 15s if active

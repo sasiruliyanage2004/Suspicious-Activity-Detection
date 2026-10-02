@@ -1,17 +1,44 @@
 import React, { useState, useEffect } from 'react'
 import CameraTile from './CameraTile.jsx'
+import { safeFetch, AI_URL } from '../utils/api.js'
 
 export default function CameraGrid({ cameras, onExpand, onRename, onRemove }) {
   const [personCounts, setPersonCounts] = useState({})
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetch('http://127.0.0.1:8002/api/person_counts')
-        .then(res => res.json())
-        .then(data => setPersonCounts(data))
-        .catch(err => console.error("Failed to fetch person counts", err))
-    }, 1000)
-    return () => clearInterval(interval)
+    let failureCount = 0
+    let timerId = null
+    let isMounted = true
+
+    const pollPersonCounts = async () => {
+      try {
+        const res = await safeFetch(`${AI_URL}/api/person_counts`, {}, 1500)
+        if (res.ok) {
+          const data = await res.json()
+          if (isMounted) {
+            setPersonCounts(data)
+            failureCount = 0
+          }
+        } else {
+          failureCount++
+        }
+      } catch (err) {
+        failureCount++
+      }
+
+      if (isMounted) {
+        // If server is unreachable or failing, back off to 20s instead of hammering every 1s
+        const nextDelay = failureCount >= 2 ? 20000 : 3000
+        timerId = setTimeout(pollPersonCounts, nextDelay)
+      }
+    }
+
+    pollPersonCounts()
+
+    return () => {
+      isMounted = false
+      if (timerId) clearTimeout(timerId)
+    }
   }, [])
 
   return (

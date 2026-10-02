@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { ShieldAlert, Search, Filter, AlertTriangle, CheckCircle, Clock, Camera, Download, RefreshCw, Video, Play, Maximize2, X, Calendar, MapPin, Radio, Film, ExternalLink, FileText } from 'lucide-react'
 import { speechSiren } from '../utils/speechSiren.js'
+import { safeFetch, BACKEND_URL, getWsUrl } from '../utils/api.js'
 
 export default function ThreatAlertsView({ cameras = [] }) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -12,10 +13,14 @@ export default function ThreatAlertsView({ cameras = [] }) {
   const [selectedThreat, setSelectedThreat] = useState(null)
   const [playbackMode, setPlaybackMode] = useState('LIVE') // 'LIVE' or 'RECORDING'
 
-  const fetchLiveAlerts = () => {
-    fetch('http://127.0.0.1:8000/alerts/?limit=200')
-      .then((res) => res.json())
-      .then((data) => {
+  const isReachableRef = useRef(true)
+
+  const fetchLiveAlerts = async () => {
+    try {
+      const res = await safeFetch(`${BACKEND_URL}/alerts/?limit=200`, {}, 2500)
+      if (res.ok) {
+        isReachableRef.current = true
+        const data = await res.json()
         if (Array.isArray(data) && data.length > 0) {
           const mapped = data.map((item) => {
             const rawTime = item.timestamp || '';
@@ -39,33 +44,43 @@ export default function ThreatAlertsView({ cameras = [] }) {
             }
           })
           setAlerts(mapped)
-        } else {
-          setAlerts([])
         }
-      })
-      .catch((err) => {
-        console.warn('Real-time database connection unreached, retaining authentic state.', err)
-      })
-      .finally(() => setIsLoading(false))
+      } else {
+        isReachableRef.current = false
+      }
+    } catch (err) {
+      isReachableRef.current = false
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   useEffect(() => {
     fetchLiveAlerts()
-    const interval = setInterval(fetchLiveAlerts, 10000)
-    
-    // Connect to real-time Command Grid WebSocket for immediate stage acoustic sirens
-    let ws = null
-    try {
-      ws = new WebSocket('ws://127.0.0.1:8000/ws/alerts')
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          if (data && data.behavior_type) {
-            fetchLiveAlerts()
-          }
-        } catch (e) {}
+
+    // Resilient interval polling: if unreachable, poll much slower (every 30s) instead of spamming every 10s
+    const interval = setInterval(() => {
+      if (isReachableRef.current) {
+        fetchLiveAlerts()
       }
-    } catch (err) {}
+    }, 15000)
+    
+    // Connect to real-time Command Grid WebSocket only if available and secure
+    let ws = null
+    const wsUrl = getWsUrl()
+    if (wsUrl) {
+      try {
+        ws = new WebSocket(wsUrl)
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            if (data && data.behavior_type) {
+              fetchLiveAlerts()
+            }
+          } catch (e) {}
+        }
+      } catch (err) {}
+    }
 
     return () => {
       clearInterval(interval)

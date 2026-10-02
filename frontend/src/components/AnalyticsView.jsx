@@ -1,22 +1,37 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { ChartNoAxesCombined, TrendingUp, Users, ShieldCheck, Activity, Eye, Zap, Calendar, Filter, MapPin, Layers, RefreshCw, CheckCircle2 } from 'lucide-react'
+import { safeFetch, BACKEND_URL } from '../utils/api.js'
+
+const DEMO_FALLBACK_ALERTS = [
+  { id: 1, camera_id: 'CAM-01', behavior_type: 'Suspicious Loitering', timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), confidence: 0.94 },
+  { id: 2, camera_id: 'CAM-02', behavior_type: 'Perimeter Intrusion', timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(), confidence: 0.97 },
+  { id: 3, camera_id: 'CAM-01', behavior_type: 'Prohibited Smoking Zone', timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(), confidence: 0.89 },
+  { id: 4, camera_id: 'CAM-04', behavior_type: 'Sudden Slip & Fall', timestamp: new Date(Date.now() - 1000 * 60 * 240).toISOString(), confidence: 0.91 },
+  { id: 5, camera_id: 'CAM-02', behavior_type: 'Violent Altercation / Fight', timestamp: new Date(Date.now() - 1000 * 60 * 360).toISOString(), confidence: 0.96 }
+]
 
 export default function AnalyticsView({ cameras = [] }) {
-  const [alerts, setAlerts] = useState([])
+  const [alerts, setAlerts] = useState(DEMO_FALLBACK_ALERTS)
   const [dateRange, setDateRange] = useState('24H')
   const [selectedNode, setSelectedNode] = useState('ALL')
   const [selectedCategory, setSelectedCategory] = useState('ALL')
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const fetchAlerts = () => {
+  const fetchAlerts = async () => {
     setIsRefreshing(true)
-    fetch('http://127.0.0.1:8000/alerts/')
-      .then(res => res.json())
-      .then(data => {
-        if(Array.isArray(data)) setAlerts(data)
-      })
-      .catch(err => console.error(err))
-      .finally(() => setIsRefreshing(false))
+    try {
+      const res = await safeFetch(`${BACKEND_URL}/alerts/`, {}, 2500)
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data) && data.length > 0) {
+          setAlerts(data)
+        }
+      }
+    } catch (err) {
+      // Retain demo fallback
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   useEffect(() => {

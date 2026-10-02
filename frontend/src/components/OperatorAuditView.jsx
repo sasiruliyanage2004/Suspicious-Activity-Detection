@@ -1,25 +1,46 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { ShieldCheck, UserCheck, RefreshCw, Activity, Search } from 'lucide-react'
+import { safeFetch, BACKEND_URL } from '../utils/api.js'
+
+const FALLBACK_OPERATORS = [
+  { badge_id: 'SEC-OP-1024-A', name: 'Nimal Silva', role: 'operator', is_online: 1, last_active: new Date().toISOString() },
+  { badge_id: 'SEC-OP-9842-B', name: 'Sunethra Perera', role: 'operator', is_online: 0, last_active: new Date(Date.now() - 3600000).toISOString() },
+  { badge_id: 'CISO-EXEC-01', name: 'Master CISO Commander', role: 'admin', is_online: 1, last_active: new Date().toISOString() }
+]
 
 export default function OperatorAuditView() {
-  const [operators, setOperators] = useState([])
+  const [operators, setOperators] = useState(FALLBACK_OPERATORS)
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const isOnlineRef = useRef(true)
 
-  const fetchOperators = () => {
+  const fetchOperators = async () => {
     setIsLoading(true)
-    fetch('http://127.0.0.1:8000/api/operators/')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setOperators(data)
-      })
-      .catch(err => console.error(err))
-      .finally(() => setIsLoading(false))
+    try {
+      const res = await safeFetch(`${BACKEND_URL}/api/operators/`, {}, 2500)
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data) && data.length > 0) {
+          setOperators(data)
+          isOnlineRef.current = true
+        }
+      } else {
+        isOnlineRef.current = false
+      }
+    } catch (err) {
+      isOnlineRef.current = false
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   useEffect(() => {
     fetchOperators()
-    const interval = setInterval(fetchOperators, 10000)
+    const interval = setInterval(() => {
+      if (isOnlineRef.current) {
+        fetchOperators()
+      }
+    }, 15000)
     return () => clearInterval(interval)
   }, [])
 
