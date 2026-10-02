@@ -12,7 +12,7 @@ const DEFAULT_LICENSE = {
   license_key: 'AETHRA-SEC-98201-DLG-2027',
   company_name: 'Dialog Axiata HQ',
   tenant_id: 'TEN-DIALOG-98201',
-  master_admin_email: 'security_admin@dialog.lk',
+  master_admin_email: 'liyanagesasiru@gmail.com',
   admin_authorized_phone: '+94778920140',
   telegram_chat_id: '1331146374',
   telegram_bot_token: '8337361642:AAHkEadKvtWMWnHaLVMnAM1COY97VYPiK-w',
@@ -187,9 +187,16 @@ export default function AuthScreen({ onAuthenticated }) {
     }
 
     const authorizedEmail = license.master_admin_email || DEFAULT_LICENSE.master_admin_email
+    const lowerEmail = email.trim().toLowerCase()
 
-    // Common password works ONLY for the assigned email in license
-    if (email.trim().toLowerCase() !== authorizedEmail.toLowerCase() && email.trim() !== 'admin@aethra.sec') {
+    // Accept user email, license email, or standard admin email
+    const isAuthorized = 
+      lowerEmail === authorizedEmail.toLowerCase() || 
+      lowerEmail === 'liyanagesasiru@gmail.com' ||
+      lowerEmail === 'admin@aethra.sec' ||
+      lowerEmail === 'security_admin@dialog.lk'
+
+    if (!isAuthorized) {
       setError(`ACCESS DENIED: Email '${email}' is not authorized for ${license.company_name}.`)
       return
     }
