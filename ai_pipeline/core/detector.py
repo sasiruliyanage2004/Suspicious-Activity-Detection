@@ -18,6 +18,14 @@ class Detector:
         elif not os.path.exists(resolved_obj):
             resolved_obj = 'yolov8n.pt'
 
+        # Check acceleration
+        try:
+            from core.acceleration_engine import accelerator
+            hw = accelerator.get_hardware_capabilities()
+            print(f"[Detector] Acceleration Hardware: {hw['device_name']} ({hw['recommended_backend']})")
+        except Exception:
+            pass
+
         print(f"[Detector] Loading pose model: {resolved_pose}")
         self.pose_model = YOLO(resolved_pose)
         print(f"[Detector] Loading object model: {resolved_obj}")
