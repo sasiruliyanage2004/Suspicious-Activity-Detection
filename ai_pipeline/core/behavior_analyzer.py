@@ -24,7 +24,7 @@ class BehaviorAnalyzer:
         self.last_violence_time = 0
     
     def analyze(self, track_id, bbox, keypoints=None, conf=0.9, zone_points=None, active_features=None):
-        if float(conf) < 0.70:
+        if float(conf) < 0.45:
             return None # Ignore uncertain detections on furniture, shadows or static noise
 
         if active_features is None:
@@ -153,25 +153,25 @@ class BehaviorAnalyzer:
 
         time_spent = current_time - history["first_seen"]
         
-        # Trigger alert ONLY if they remain suspiciously stationary in restricted zone for > 60 seconds
-        if time_spent > 60.0:
+        # Trigger alert if they remain suspiciously stationary in restricted zone for > 8 seconds
+        if time_spent > 8.0:
             is_new = False
-            # 5-Minute (300 seconds) strict cooldown per individual to prevent duplicate dashboard warning rows!
-            if current_time - history.get("last_alert_time", 0) > 300.0:
+            # 30-second cooldown per individual to prevent spam while keeping alerts responsive for demo/review
+            if current_time - history.get("last_alert_time", 0) > 30.0:
                 is_new = True
                 history["last_alert_time"] = current_time
                 
                 if active_features.get("loitering_detection", True):
                     return {
                         "behavior": "Suspicious Activity",
-                        "confidence": max(0.85, float(conf)),
-                        "details": f"Verified loitering threat: Person {track_id} stationary in target perimeter for over 60 seconds.",
+                        "confidence": max(0.88, float(conf)),
+                        "details": f"Verified loitering threat: Person {track_id} stationary in target perimeter for over {int(time_spent)} seconds.",
                         "is_new": True
                     }
         
         return None
 
-    def analyze_weapons(self, weapon_results, threshold=0.65, person_boxes=None, scale=1.0):
+    def analyze_weapons(self, weapon_results, threshold=0.35, person_boxes=None, scale=1.0):
         current_time = time.time()
         
         # Check if weapon model detected anything
@@ -182,27 +182,28 @@ class BehaviorAnalyzer:
         boxes = weapon_results[0].boxes
         if boxes is None or len(boxes) == 0:
             self.weapon_consecutive_frames = 0
-            # No weapons detected. Reset alert after 5 seconds of clear frame
-            if current_time - self.last_weapon_alert_time > 5.0:
+            # No weapons detected. Reset alert after 4 seconds of clear frame
+            if current_time - self.last_weapon_alert_time > 4.0:
                 self.weapon_alerted = False
             return None
             
         # Iterate over detections
         highest_conf_box = None
         for box in boxes:
-            if box.conf.item() > threshold:
-                # Spatial Verification: If person_boxes are available, ensure weapon overlaps with a person!
+            box_conf = box.conf.item()
+            if box_conf > threshold:
+                # Spatial Verification: If person_boxes are available, check proximity or high confidence
                 is_valid = True
-                if person_boxes is not None and len(person_boxes) > 0:
+                if person_boxes is not None and len(person_boxes) > 0 and box_conf < 0.60:
                     is_valid = False
                     wx1, wy1, wx2, wy2 = box.xyxy[0].cpu().numpy()
                     wx1, wy1, wx2, wy2 = wx1/scale, wy1/scale, wx2/scale, wy2/scale
                     
                     for pbox in person_boxes:
                         px1, py1, px2, py2 = pbox
-                        # Add 40% padding to person box to account for outstretched arms holding a weapon
-                        padding_x = (px2 - px1) * 0.4
-                        padding_y = (py2 - py1) * 0.4
+                        # Add 60% padding to person box to account for outstretched arms holding a weapon
+                        padding_x = (px2 - px1) * 0.6
+                        padding_y = (py2 - py1) * 0.6
                         px1, py1 = px1 - padding_x, py1 - padding_y
                         px2, py2 = px2 + padding_x, py2 + padding_y
                         
@@ -221,8 +222,8 @@ class BehaviorAnalyzer:
             
         self.weapon_consecutive_frames += 1
         
-        # Require 3 consecutive YOLO passes detecting a weapon to eliminate split-second false positives
-        if self.weapon_consecutive_frames < 3:
+        # Fast confirmation: 2 passes or immediate if high confidence
+        if self.weapon_consecutive_frames < 2 and highest_conf_box.conf.item() < 0.50:
             return None
             
         cls_id = int(highest_conf_box.cls.item())

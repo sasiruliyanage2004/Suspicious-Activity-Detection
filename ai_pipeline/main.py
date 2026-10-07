@@ -226,7 +226,7 @@ detector_cam1 = Detector()
 detector_cam2 = Detector()
 analyzer_cam1 = BehaviorAnalyzer()
 analyzer_cam2 = BehaviorAnalyzer()
-api = APIClient()
+api = APIClient(base_url=settings.BACKEND_URL)
 # Emotion detection disabled by default - it's too CPU-heavy for real-time streaming
 emotion_detector = None
 
@@ -535,13 +535,34 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                         cv2.rectangle(annotated_frame, (int(wx1), int(wy1)), (int(wx2), int(wy2)), (0, 0, 255), 4)
                         cv2.putText(annotated_frame, f"WEAPON: {weapon_type}", (int(wx1), int(wy1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
-                # 2b. Draw Vehicle Detections (Car, Van, SUV, Motorcycle, Bus, Truck, Bicycle)
+                # 2b. Draw Vehicle & Weapon Detections
                 v_boxes = last_draw_data.get('vehicle_boxes', [])
                 v_classes = last_draw_data.get('vehicle_classes', [])
                 v_confs = last_draw_data.get('vehicle_confs', [])
                 v_ids = last_draw_data.get('vehicle_ids', [])
                 
                 for v_box, v_cls, v_conf, v_id in zip(v_boxes, v_classes, v_confs, v_ids):
+                    # Handle Knives & Sharp/Blunt Weapons detected by YOLO object model (Class 43: Knife, 76: Scissors, 34: Baseball Bat)
+                    if v_cls in [34, 43, 76] and v_conf >= 0.40:
+                        w_label = "Knife" if v_cls == 43 else ("Scissors" if v_cls == 76 else "Bat / Club")
+                        vx1, vy1, vx2, vy2 = [int(v) for v in v_box]
+                        cv2.rectangle(annotated_frame, (vx1, vy1), (vx2, vy2), (0, 0, 255), 4)
+                        cv2.putText(annotated_frame, f"WEAPON: {w_label.upper()}", (vx1, max(15, vy1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+                        
+                        # Throttle weapon alert to once every 10 seconds per camera
+                        now_w = time.time()
+                        if not hasattr(cam_analyzer, '_last_knife_alert') or now_w - cam_analyzer._last_knife_alert > 10.0:
+                            cam_analyzer._last_knife_alert = now_w
+                            res = api.send_alert(
+                                camera_id=camera_id,
+                                behavior_type=f"{w_label} Detected",
+                                confidence=float(v_conf),
+                                details=f"Active threat detected: {w_label} (Confidence: {v_conf*100:.1f}%)"
+                            )
+                            clip_url = res[0] if res else ""
+                            notifier.send_alert(f"CRITICAL: {w_label} detected on {camera_id}", annotated_frame, clip_url)
+                        continue
+
                     if v_conf >= 0.60:
                         v_type = attr_recognizer.classify_vehicle(v_cls, v_box)
                         
@@ -589,7 +610,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                     ptz_target_tracked = False
                     person_boxes = []
                     for i, (box, track_id, class_id, conf) in enumerate(zip(boxes, track_ids, class_ids, confs)):
-                        if class_id == 0 and conf >= 0.75:
+                        if class_id == 0 and conf >= 0.45:
                             current_person_ids.add(track_id)
                             current_person_boxes[track_id] = box
                             person_boxes.append(box)
@@ -693,7 +714,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                     # Group Behavior Analysis (e.g. Fighting)
                     person_tracks = []
                     for box, track_id, class_id, conf in zip(boxes, track_ids, class_ids, confs):
-                        if class_id == 0 and conf >= 0.75:
+                        if class_id == 0 and conf >= 0.45:
                             person_tracks.append(track_id)
                     
                     group_alert = None
@@ -757,11 +778,13 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                     for box in weapon_results[0].boxes:
                         if box.conf.item() > GLOBAL_WEAPON_THRESHOLD:
                             x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                            if 'scale' in locals() and scale < 1.0:
+                                x1, y1, x2, y2 = x1/scale, y1/scale, x2/scale, y2/scale
                             cls_id = int(box.cls.item())
                             weapon_type = weapon_results[0].names[cls_id].upper()
                             
                             cv2.rectangle(annotated_frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 4)
-                            cv2.putText(annotated_frame, weapon_type, (int(x1), int(y1)-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                            cv2.putText(annotated_frame, f"WEAPON: {weapon_type}", (int(x1), max(20, int(y1)-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
                 # 4. Render Emotion Detection Results & Trigger Alerts
                 if enable_emotion and last_emotions:

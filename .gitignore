@@ -34,6 +34,8 @@ temp_clips/
 # (Large files that exceed GitHub file limits > 50MB/100MB)
 # ========================================================
 *.pt
+!models/best.pt
+!ai_pipeline/models/best.pt
 *.pth
 *.onnx
 *.weights
