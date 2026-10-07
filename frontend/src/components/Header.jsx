@@ -127,20 +127,32 @@ export default function Header({
           </div>
         </div>
 
-        {/* Center controls - Adjusted gaps and breakpoints to prevent overlap */}
-        <div className="hidden xl:flex flex-1 justify-center items-center gap-3 xl:gap-6 mx-2">
-          {/* Hide System Secure badge to save space on normal screens */}
-          <div className="hidden min-[1700px]:flex items-center gap-2 rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/25 px-3.5 h-8">
+        {/* Center Tactical Status Pills (Matches Video) */}
+        <div className="hidden lg:flex flex-1 justify-center items-center gap-2.5 mx-2">
+          {/* 1. Gates Status Pill */}
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider border ${
+            gatesLocked 
+              ? 'bg-red-500/15 text-red-300 border-red-500/40 shadow-[0_0_10px_rgba(239,68,68,0.2)]' 
+              : 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${gatesLocked ? 'bg-red-400' : 'bg-cyan-400'}`} />
+            <span>GATES {gatesLocked ? 'LOCKED' : 'UNLOCKED'}</span>
+          </div>
+
+          {/* 2. Re-ID Target Tracking Pill */}
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider border bg-emerald-500/10 text-emerald-300 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
             <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
             </span>
-            <span className="font-mono text-[10.5px] tracking-wider text-emerald-300 uppercase">System Secure</span>
+            <span>RE-ID TRACKING ACTIVE</span>
           </div>
 
-
-
-
+          {/* 3. Alerts Active Pill */}
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider border bg-cyan-500/10 text-cyan-300 border-cyan-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            <span>AI PERIMETER ARMED</span>
+          </div>
         </div>
 
         {/* Right controls */}

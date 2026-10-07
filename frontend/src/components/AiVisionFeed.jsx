@@ -192,6 +192,36 @@ export default function AiVisionFeed({
           ctx.fillRect(posX, posY + boxH + 2, 90, 14)
           ctx.fillStyle = '#FFDD00'
           ctx.fillText(`ALPR: ${target.plate}`, posX + 4, posY + boxH + 12)
+        } else if (hasThreat) {
+          // Tactical Threat Telemetry Overlay (Matches Reference Video Frame 50s)
+          const threatStr = (threat.label || '').toLowerCase()
+          const isThreatBag = threatStr.includes('bag') || threatStr.includes('luggage') || threatStr.includes('object') || threatStr.includes('unattended')
+          const isThreatWeapon = threatStr.includes('weapon') || threatStr.includes('gun') || threatStr.includes('knife')
+
+          const cardW = Math.max(boxW, 150)
+          ctx.fillStyle = 'rgba(5, 7, 12, 0.92)'
+          ctx.fillRect(posX, posY + boxH + 3, cardW, 26)
+          ctx.strokeStyle = '#FF2A42'
+          ctx.lineWidth = 1
+          ctx.strokeRect(posX, posY + boxH + 3, cardW, 26)
+
+          ctx.font = 'bold 8px monospace'
+          if (isThreatBag) {
+            ctx.fillStyle = '#FF3344'
+            ctx.fillText('OBJECT: SUSPICIOUS LUGGAGE', posX + 5, posY + boxH + 13)
+            ctx.fillStyle = '#00F0FF'
+            ctx.fillText('LUGGAGE MODULE: ACTIVE [98.4%]', posX + 5, posY + boxH + 24)
+          } else if (isThreatWeapon) {
+            ctx.fillStyle = '#FF2A42'
+            ctx.fillText('LETHAL THREAT: WEAPON BRANDISHED', posX + 5, posY + boxH + 13)
+            ctx.fillStyle = '#FFDD00'
+            ctx.fillText('BALLISTIC RADAR: ARMED [99.1%]', posX + 5, posY + boxH + 24)
+          } else {
+            ctx.fillStyle = '#FF8800'
+            ctx.fillText('BEHAVIOR: PERIMETER ANOMALY', posX + 5, posY + boxH + 13)
+            ctx.fillStyle = '#00FF66'
+            ctx.fillText('SECURITY STATUS: DISPATCHED', posX + 5, posY + boxH + 24)
+          }
         }
       })
 

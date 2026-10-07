@@ -101,23 +101,44 @@ export default function Dashboard({ cameras, onExpandCamera, onRename, onProvisi
 
 
 
-      {activeThreats > 0 && (
-        <div className="glass-panel rounded-2xl p-4 flex flex-wrap items-center gap-3 ring-1 ring-crimson-glow/25 shadow-glow-crimson">
-          <div className="flex items-center gap-2 text-crimson-glow shrink-0">
-            <TriangleAlert size={16} className="animate-pulse-dot" />
-            <span className="font-mono text-[11px] tracking-wider uppercase">Live Threat Feed</span>
+        {/* Live Threat Feed Ribbon (Persistent Tactical Banner - Matches Video) */}
+        <div className={`glass-panel rounded-2xl p-3.5 flex flex-wrap items-center gap-3 transition-all duration-300 border ${
+          activeThreats > 0
+            ? 'border-red-500/50 bg-red-950/20 shadow-[0_0_25px_rgba(239,68,68,0.25)] ring-1 ring-red-500/40'
+            : 'border-cyan-500/30 bg-cyan-950/15 shadow-[0_0_15px_rgba(0,255,255,0.08)]'
+        }`}>
+          <div className={`flex items-center gap-2 shrink-0 ${activeThreats > 0 ? 'text-red-400' : 'text-cyan-400'}`}>
+            {activeThreats > 0 ? (
+              <TriangleAlert size={16} className="animate-pulse text-red-400" />
+            ) : (
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping mr-1" />
+            )}
+            <span className="font-mono text-[11px] font-bold tracking-widest uppercase">
+              LIVE THREAT FEED:
+            </span>
           </div>
-          <div className="divider-fade hidden sm:block flex-1 !w-px !h-6 sm:!h-6" />
-          <div className="flex flex-wrap gap-2 flex-1">
-            {cameras.filter(c => c.threat).map((c) => (
-              <div key={c.id} className="flex items-center gap-2 rounded-full bg-crimson-glow/10 ring-1 ring-crimson-glow/25 px-3 py-1.5">
-                <span className="text-[12px] text-white/85 font-medium">{c.threat.label}</span>
-                <span className="text-[11px] text-white/35">· {c.location}</span>
-              </div>
-            ))}
-          </div>
+
+          <div className="divider-fade hidden sm:block flex-1 !w-px !h-5" />
+
+          {activeThreats > 0 ? (
+            <div className="flex flex-wrap gap-2 flex-1">
+              {cameras.filter(c => c.threat).map((c) => (
+                <div key={c.id} className="flex items-center gap-2 rounded-full bg-red-500/20 ring-1 ring-red-500/50 px-3.5 py-1 text-white animate-pulse">
+                  <span className="text-[12px] font-bold text-red-200">🚨 {c.threat.label}</span>
+                  <span className="text-[11px] text-white/50">· {c.location}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 text-cyan-300/80 font-mono text-[11px] flex-1">
+              <span>All 10 Perimeter Zones Secure</span>
+              <span className="text-white/20">|</span>
+              <span className="text-gray-400">Automated YOLOv11 & Lethal Threat Detection Active</span>
+              <span className="text-white/20">|</span>
+              <span className="text-emerald-400 font-semibold">● Zero Incursions Reported</span>
+            </div>
+          )}
         </div>
-      )}
 
       <div>
         {/* Network Scanner Button */}

@@ -9,34 +9,37 @@ export default function Ticker() {
       </div>
       <div className="w-full overflow-hidden relative flex-1">
         <div className="whitespace-nowrap animate-marquee flex gap-12 font-mono text-[10px] text-cyan-500/70 tracking-widest uppercase">
-          <span>AETHRA VISION OS v2.1</span>
+          <span>AETHRA VISION CORE v2.4</span>
           <span>&bull;</span>
           <span>SYSTEM NOMINAL</span>
           <span>&bull;</span>
           <span>ALL ZONES SECURE</span>
           <span>&bull;</span>
-          <span>AI ENGINE ACTIVE</span>
+          <span>YOLOV11 POSE ACTIVE</span>
           <span>&bull;</span>
-          <span>LATENCY 12ms</span>
+          <span>WEAPON & BAGGAGE RADAR ARMED</span>
           <span>&bull;</span>
-          <span>ENCRYPTION AES-256</span>
+          <span>CROSS-CAMERA RE-ID 99.1%</span>
           <span>&bull;</span>
-          <span>BIOMETRIC SCANNING ONLINE</span>
-          <span>&bull;</span>
-          <span>AETHRA VISION OS v2.1</span>
-          <span>&bull;</span>
-          <span>SYSTEM NOMINAL</span>
-          <span>&bull;</span>
-          <span>ALL ZONES SECURE</span>
-          <span>&bull;</span>
-          <span>AI ENGINE ACTIVE</span>
-          <span>&bull;</span>
-          <span>LATENCY 12ms</span>
-          <span>&bull;</span>
-          <span>ENCRYPTION AES-256</span>
+          <span>AUTONOMOUS PTZ TRACKING</span>
           <span>&bull;</span>
           <span>BIOMETRIC SCANNING ONLINE</span>
         </div>
+      </div>
+
+      {/* Right Telemetry Status (Matches Reference Video Frame 20s) */}
+      <div className="hidden lg:flex items-center gap-3 px-4 bg-cyan-950/60 h-full border-l border-cyan-500/30 shrink-0 font-mono text-[9.5px] text-cyan-300/80 uppercase tracking-wider z-10">
+        <span>ENCRYPTION: <strong className="text-cyan-200">AES-256</strong></span>
+        <span className="text-white/20">|</span>
+        <span>LATENCY: <strong className="text-emerald-400">12MS</strong></span>
+        <span className="text-white/20">|</span>
+        <span>CPU LOAD: <strong className="text-cyan-300">34%</strong></span>
+        <span className="text-white/20">|</span>
+        <span>MEM: <strong className="text-cyan-300">18.2GB</strong></span>
+        <span className="text-white/20">|</span>
+        <span>FPS: <strong className="text-emerald-400">60FPS</strong></span>
+        <span className="text-white/20">|</span>
+        <span>DISK: <strong className="text-cyan-300">78%</strong></span>
       </div>
     </div>
   );
