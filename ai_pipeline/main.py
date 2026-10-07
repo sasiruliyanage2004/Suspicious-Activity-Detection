@@ -526,14 +526,15 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                         )
                     if weapon_alert and weapon_alert.get("box") is not None:
                         wbox = weapon_alert["box"]
-                        wx1, wy1, wx2, wy2 = wbox.xyxy[0].cpu().numpy()
-                        # Scale weapon box if needed
-                        if 'scale' in locals() and scale < 1.0:
-                            wx1, wy1, wx2, wy2 = wx1/scale, wy1/scale, wx2/scale, wy2/scale
                         wcls_id = int(wbox.cls.item())
                         weapon_type = weapon_results[0].names[wcls_id].upper()
-                        cv2.rectangle(annotated_frame, (int(wx1), int(wy1)), (int(wx2), int(wy2)), (0, 0, 255), 4)
-                        cv2.putText(annotated_frame, f"WEAPON: {weapon_type}", (int(wx1), int(wy1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+                        if weapon_type.lower() in ['gun', 'knife', 'pistol', 'firearm', 'dagger']:
+                            wx1, wy1, wx2, wy2 = wbox.xyxy[0].cpu().numpy()
+                            # Scale weapon box if needed
+                            if 'scale' in locals() and scale < 1.0:
+                                wx1, wy1, wx2, wy2 = wx1/scale, wy1/scale, wx2/scale, wy2/scale
+                            cv2.rectangle(annotated_frame, (int(wx1), int(wy1)), (int(wx2), int(wy2)), (0, 0, 255), 4)
+                            cv2.putText(annotated_frame, f"WEAPON: {weapon_type}", (int(wx1), int(wy1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
                 # 2b. Draw Vehicle & Weapon Detections
                 v_boxes = last_draw_data.get('vehicle_boxes', [])
@@ -777,12 +778,31 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                 if weapon_results and len(weapon_results) > 0 and weapon_results[0].boxes is not None and len(weapon_results[0].boxes) > 0:
                     for box in weapon_results[0].boxes:
                         if box.conf.item() > GLOBAL_WEAPON_THRESHOLD:
+                            cls_id = int(box.cls.item())
+                            raw_w_name = weapon_results[0].names[cls_id].lower()
+                            # Strict filter: Only allow genuine firearm or bladed weapon threats; suppress false positives like grenade/head
+                            if raw_w_name not in ['gun', 'knife', 'pistol', 'firearm', 'dagger']:
+                                continue
+                            
                             x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                             if 'scale' in locals() and scale < 1.0:
                                 x1, y1, x2, y2 = x1/scale, y1/scale, x2/scale, y2/scale
-                            cls_id = int(box.cls.item())
+
+                            # Suppress if weapon box overlaps human head/face area
+                            is_head = False
+                            if boxes is not None and len(boxes) > 0:
+                                wcx, wcy = (x1 + x2) / 2, (y1 + y2) / 2
+                                for pbox in boxes:
+                                    px1, py1, px2, py2 = pbox
+                                    pw = max(1, px2 - px1)
+                                    ph = max(1, py2 - py1)
+                                    if (px1 + pw * 0.1) <= wcx <= (px2 - pw * 0.1) and py1 <= wcy <= (py1 + ph * 0.50):
+                                        is_head = True
+                                        break
+                            if is_head:
+                                continue
+
                             weapon_type = weapon_results[0].names[cls_id].upper()
-                            
                             cv2.rectangle(annotated_frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 4)
                             cv2.putText(annotated_frame, f"WEAPON: {weapon_type}", (int(x1), max(20, int(y1)-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 

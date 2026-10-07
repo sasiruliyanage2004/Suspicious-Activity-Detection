@@ -98,10 +98,10 @@ class Detector:
             else:
                 self.last_object_results = None
 
-            # 3. Dedicated Weapon detection (Gun, Knife, Explosive, Grenade)
+            # 3. Dedicated Weapon detection (Gun, Knife)
             if run_weapons and self.weapon_model is not None:
                 if self.frame_count % 2 == 0 or self.last_weapon_results is None:
-                    self.last_weapon_results = self.weapon_model.predict(frame, conf=0.25, verbose=False)
+                    self.last_weapon_results = self.weapon_model.predict(frame, conf=0.50, verbose=False)
             else:
                 self.last_weapon_results = None
 

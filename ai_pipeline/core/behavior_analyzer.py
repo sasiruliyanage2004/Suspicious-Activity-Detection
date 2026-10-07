@@ -191,30 +191,36 @@ class BehaviorAnalyzer:
         highest_conf_box = None
         for box in boxes:
             box_conf = box.conf.item()
+            cls_id = int(box.cls.item())
+            raw_name = weapon_results[0].names[cls_id].lower()
+            
+            # STRICT FILTER: Only Guns and Knives. Reject grenade/explosion to eliminate head/face false positives!
+            if raw_name not in ['gun', 'knife', 'pistol', 'firearm', 'dagger']:
+                continue
+
             if box_conf > threshold:
-                # Spatial Verification: If person_boxes are available, check proximity or high confidence
-                is_valid = True
-                if person_boxes is not None and len(person_boxes) > 0 and box_conf < 0.60:
-                    is_valid = False
-                    wx1, wy1, wx2, wy2 = box.xyxy[0].cpu().numpy()
-                    wx1, wy1, wx2, wy2 = wx1/scale, wy1/scale, wx2/scale, wy2/scale
-                    
+                wx1, wy1, wx2, wy2 = box.xyxy[0].cpu().numpy()
+                wx1, wy1, wx2, wy2 = wx1/scale, wy1/scale, wx2/scale, wy2/scale
+                
+                # Check for Head / Face Collision (A human head/face is NOT a handheld weapon!)
+                is_head_false_positive = False
+                if person_boxes is not None and len(person_boxes) > 0:
                     for pbox in person_boxes:
                         px1, py1, px2, py2 = pbox
-                        # Add 60% padding to person box to account for outstretched arms holding a weapon
-                        padding_x = (px2 - px1) * 0.6
-                        padding_y = (py2 - py1) * 0.6
-                        px1, py1 = px1 - padding_x, py1 - padding_y
-                        px2, py2 = px2 + padding_x, py2 + padding_y
-                        
-                        # Check bounding box intersection
-                        if not (wx2 < px1 or wx1 > px2 or wy2 < py1 or wy1 > py2):
-                            is_valid = True
+                        p_w = max(1, px2 - px1)
+                        p_h = max(1, py2 - py1)
+                        # Head area is the top 50% of the person box
+                        head_box = (px1 + p_w * 0.1, py1, px2 - p_w * 0.1, py1 + p_h * 0.50)
+                        wcx, wcy = (wx1 + wx2) / 2, (wy1 + wy2) / 2
+                        if head_box[0] <= wcx <= head_box[2] and head_box[1] <= wcy <= head_box[3]:
+                            is_head_false_positive = True
                             break
                             
-                if is_valid:
-                    highest_conf_box = box
-                    break
+                if is_head_false_positive:
+                    continue
+
+                highest_conf_box = box
+                break
                     
         if highest_conf_box is None:
             self.weapon_consecutive_frames = 0
