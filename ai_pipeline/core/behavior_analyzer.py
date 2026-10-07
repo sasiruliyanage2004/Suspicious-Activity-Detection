@@ -371,8 +371,8 @@ class BehaviorAnalyzer:
                         is_new = not self.unattended_history[obj_key]["alerted"]
                         self.unattended_history[obj_key]["alerted"] = True
                         return {
-                            "behavior": "Unattended Object Left Behind",
-                            "confidence": 0.91,
+                            "behavior": "Suspicious Baggage Detected",
+                            "confidence": 0.96,
                             "details": f"Unattended {obj_name} detected with no owner nearby for {time_abandoned:.1f}s!",
                             "is_new": is_new,
                             "box": box

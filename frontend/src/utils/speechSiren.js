@@ -75,18 +75,22 @@ class SpeechSirenManager {
 
       const isBaggage = behaviorType.toLowerCase().includes('bag') ||
                         behaviorType.toLowerCase().includes('luggage') ||
-                        behaviorType.toLowerCase().includes('abandon');
+                        behaviorType.toLowerCase().includes('abandon') ||
+                        behaviorType.toLowerCase().includes('unattended') ||
+                        behaviorType.toLowerCase().includes('object');
 
       let speechDelay = 100;
 
       if (isBaggage) {
-        // Custom warning chime for baggage (not dangerous, just a warning)
-        this.playTacticalBeep(500, 0.4, 'sine');
-        setTimeout(() => this.playTacticalBeep(700, 0.5, 'sine'), 450);
-        speechDelay = 1200;
+        // Custom warning chime for baggage / suspicious object
+        this.playTacticalBeep(520, 0.35, 'sine');
+        setTimeout(() => this.playTacticalBeep(780, 0.45, 'sine'), 400);
+        speechDelay = 1100;
       }
 
-      const cleanBehavior = strReplaceAll(strReplaceAll(behaviorType, "Detected", ""), "Activity", "").trim() || behaviorType;
+      const cleanBehavior = isBaggage 
+        ? "Suspicious Unattended Baggage" 
+        : (strReplaceAll(strReplaceAll(behaviorType, "Detected", ""), "Activity", "").trim() || behaviorType);
       
       const engText = `Warning: ${cleanBehavior} detected. Security personnel notified.`;
       const utteranceEng = new SpeechSynthesisUtterance(engText);
