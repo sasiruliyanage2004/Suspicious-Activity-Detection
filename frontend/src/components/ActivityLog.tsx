@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Activity, ShieldAlert, CheckCircle, Video, Search } from 'lucide-react'
 
+import { getWsUrl } from '../utils/api'
+
 export default function ActivityLog() {
   const [logs, setLogs] = useState([
     { id: 1, type: 'info', msg: 'System initialized & neural net loaded', time: 'Just now' },
@@ -8,9 +10,11 @@ export default function ActivityLog() {
 
   // Connect to real AI backend WebSockets
   useEffect(() => {
-    let ws = null;
+    let ws: WebSocket | null = null;
+    const wsUrl = getWsUrl();
+    if (!wsUrl) return;
     try {
-      ws = new WebSocket('ws://127.0.0.1:8000/ws/alerts');
+      ws = new WebSocket(wsUrl);
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);

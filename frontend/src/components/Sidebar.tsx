@@ -7,6 +7,7 @@ const NAV = [
   { key: 'cameras', icon: Camera, label: 'Connect & Setup Cameras' },
   { key: 'nvr', icon: Clapperboard, label: 'Recorded Video Clips' },
   { key: 'alerts', icon: ShieldAlert, label: 'Security Alert Logs' },
+  { key: 'cyber', icon: ShieldAlert, label: 'Cyber Defense & IP Firewall' },
   { key: 'analytics', icon: ChartNoAxesCombined, label: 'AI Detection Statistics' },
   { key: 'zones', icon: ScanLine, label: 'Restricted Zones Setup' },
   { key: 'whitelist', icon: Users, label: 'Personnel Whitelist' },

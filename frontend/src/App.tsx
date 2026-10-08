@@ -18,6 +18,8 @@ import CameraNodesView from './components/CameraNodesView'
 import OperatorAuditView from './components/OperatorAuditView'
 import IntrusionZonesView from './components/IntrusionZonesView'
 import PersonnelHub from './components/PersonnelHub'
+import CyberShieldView from './components/CyberShieldView'
+import { useToast } from './components/ToastContext'
 
 const INITIAL_CAMERAS = [
   { id: 1, code: 'CAM-01', location: 'Main Entrance Gate', streamUrl: 'http://127.0.0.1:8002/api/video_feed/1', attributes: [], threat: null },
@@ -40,6 +42,7 @@ function loadCamerasFromStorage() {
 }
 
 export default function App() {
+  const toast = useToast()
   const [showSplash, setShowSplash] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
   const [activeUser, setActiveUser] = useState(null)
@@ -132,6 +135,18 @@ export default function App() {
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+            if (data && data.type === 'CYBER_THREAT') {
+              speechSiren.playTacticalBeep(520, 0.35, 'sawtooth');
+              if (toast) {
+                (toast as any).addToast({
+                  type: 'error',
+                  title: `🚨 CYBER INTRUSION BLOCKED (${data.cyber_event?.threat_type || 'ATTACK'})`,
+                  message: `${data.details}`,
+                  duration: 8000
+                });
+              }
+              return;
+            }
             if (data && data.behavior_type) {
               speechSiren.speakAlarm(data.behavior_type, data.camera_id);
               
@@ -281,6 +296,10 @@ export default function App() {
 
         {activeTab === 'alerts' && (
           <ThreatAlertsView cameras={cameras} />
+        )}
+
+        {activeTab === 'cyber' && (
+          <CyberShieldView />
         )}
 
         {activeTab === 'analytics' && (

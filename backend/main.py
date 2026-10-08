@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status, BackgroundTasks
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
@@ -86,8 +86,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from core.cyber_shield import CyberShieldMiddleware, cyber_shield
+import api.routers.security as security_router
+
+app.add_middleware(CyberShieldMiddleware)
+
 app.include_router(alerts.router)
 app.include_router(operators.router)
+app.include_router(security_router.router)
 
 from core.ws_manager import manager
 
@@ -161,9 +167,11 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     return {"message": "User registered successfully"}
 
 @app.post("/api/auth/login")
-def login(user: UserLogin, db: Session = Depends(get_db)):
+def login(user: UserLogin, request: Request, db: Session = Depends(get_db)):
+    ip = cyber_shield.get_client_ip(request)
     db_user = db.query(User).filter(User.username == user.username).first()
     if not db_user or not pwd_context.verify(user.password, db_user.hashed_password):
+        cyber_shield.record_failed_login(ip, user.username)
         raise HTTPException(status_code=401, detail="Invalid username or password")
     
     token = create_access_token(data={"sub": db_user.username})
