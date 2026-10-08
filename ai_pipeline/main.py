@@ -115,6 +115,33 @@ def get_handoffs():
     """Returns recent cross-camera person handoff events for the dashboard."""
     return global_tracker.get_recent_handoffs(since_seconds=30)
 
+CAMERA_FLIP = {"default_cam1": True}
+
+def is_camera_flipped(camera_id: str) -> bool:
+    cid_str = str(camera_id).upper().replace("-", "").replace(" ", "")
+    for k, v in CAMERA_FLIP.items():
+        k_norm = str(k).upper().replace("-", "").replace(" ", "")
+        if k_norm in cid_str or cid_str in k_norm:
+            return v
+    # Default: webcam / Cam-01 is flipped horizontally so movement matches real-life mirror reflection
+    if "0" in cid_str or "WEBCAM" in cid_str or "CAM01" in cid_str or "1" in cid_str:
+        return CAMERA_FLIP.get("default_cam1", True)
+    return False
+
+@app.get("/api/cameras/{camera_id}/mirror_status")
+def get_mirror_status(camera_id: str):
+    return {"status": "success", "camera_id": camera_id, "is_mirrored": is_camera_flipped(camera_id)}
+
+@app.post("/api/cameras/{camera_id}/toggle_mirror")
+def toggle_mirror(camera_id: str):
+    cid_str = str(camera_id).upper().replace("-", "").replace(" ", "")
+    current = is_camera_flipped(camera_id)
+    new_state = not current
+    CAMERA_FLIP[cid_str] = new_state
+    if "0" in cid_str or "WEBCAM" in cid_str or "CAM01" in cid_str or "1" in cid_str:
+        CAMERA_FLIP["default_cam1"] = new_state
+    return {"status": "success", "camera_id": camera_id, "is_mirrored": new_state}
+
 CAMERA_ZONES = {}
 
 class ZoneCoords(BaseModel):
@@ -419,6 +446,8 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                             continue
                     
                 frame = enhance_low_light(frame)
+                if is_camera_flipped(camera_id):
+                    frame = cv2.flip(frame, 1)
                 
                 if frame_counter % 30 == 0:
                     current_zones = CAMERA_ZONES.get(str(camera_id), [])

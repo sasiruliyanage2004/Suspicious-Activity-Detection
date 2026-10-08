@@ -18,7 +18,8 @@ import {
   Eye,
   EyeOff,
   Shield,
-  Cpu
+  Cpu,
+  FlipHorizontal
 } from 'lucide-react'
 import ZoneDrawer from './ZoneDrawer'
 import AiVisionFeed from './AiVisionFeed'
@@ -163,6 +164,25 @@ export default function CameraExpandedView({ camera, index = 0, onClose }: Camer
             <span className="hud-badge bg-black/70 backdrop-blur-md border border-white/15 font-mono text-[10px] text-emerald-400 font-bold flex items-center gap-1.5 shadow-sm">
               <Radio size={11} className="animate-pulse" /> LIVE STREAM
             </span>
+
+            {/* Mirror / Flip Camera Toggle */}
+            <button
+              onClick={() => {
+                fetch(`http://127.0.0.1:8002/api/cameras/${camera.code}/toggle_mirror`, { method: 'POST' })
+                  .then((res) => res.json())
+                  .then((data) => {
+                    flashToast(data.is_mirrored ? '🪞 Camera Mirror Mode: ON' : '📷 Camera Normal Mode: ON')
+                  })
+                  .catch(() => {
+                    flashToast('🪞 Camera Mirror Toggled')
+                  })
+              }}
+              title="Toggle Camera Mirror / Flip Horizontal"
+              className="h-9 px-3 flex items-center gap-1.5 rounded-full bg-white/[0.08] hover:bg-white/15 ring-1 ring-white/10 text-white/80 hover:text-cyan-400 text-xs font-mono transition-all focus-ring"
+            >
+              <FlipHorizontal size={14} />
+              <span className="hidden sm:inline">Mirror Feed</span>
+            </button>
 
             {/* Show / Hide PTZ Overlay Controls Toggle */}
             <button

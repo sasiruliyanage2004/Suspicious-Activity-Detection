@@ -1,5 +1,5 @@
 import React, { useState, memo } from 'react'
-import { Pencil, Check, TriangleAlert, Video, Radio, Activity, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Crosshair } from 'lucide-react'
+import { Pencil, Check, TriangleAlert, Video, Radio, Activity, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Crosshair, FlipHorizontal } from 'lucide-react'
 import { playBleep } from '../utils/sounds'
 import AiVisionFeed from './AiVisionFeed'
 
@@ -178,6 +178,20 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
           {filterMode === 'normal' && <span>⚡ RGB NORMAL</span>}
           {filterMode === 'ir_green' && <span>🌙 NVG IR-GREEN</span>}
           {filterMode === 'thermal' && <span>🔥 THERMAL MAP</span>}
+        </button>
+
+        {/* Quick Mirror / Flip Camera Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            playBleep()
+            fetch(`http://127.0.0.1:8002/api/cameras/${camera.code}/toggle_mirror`, { method: 'POST' }).catch(() => {})
+          }}
+          title="Click to Flip / Mirror Camera Feed Horizontally"
+          className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-black/60 text-gray-300 border border-white/10 hover:bg-cyan-500/20 hover:text-cyan-300 hover:border-cyan-400 transition-all shadow-md"
+        >
+          <FlipHorizontal size={10} />
+          <span>FLIP</span>
         </button>
       </div>
 
