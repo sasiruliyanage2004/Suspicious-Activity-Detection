@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { ShieldCheck, UserCheck, RefreshCw, Activity, Search } from 'lucide-react'
-import { safeFetch, BACKEND_URL } from '../utils/api.js'
+import { safeFetch, BACKEND_URL } from '../utils/api'
 
 const FALLBACK_OPERATORS = [
   { badge_id: 'SEC-OP-1024-A', name: 'Nimal Silva', role: 'operator', is_online: 1, last_active: new Date().toISOString() },

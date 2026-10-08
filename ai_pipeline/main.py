@@ -474,6 +474,39 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                             kp_data[:, :, 0:2] = kp_data[:, :, 0:2] / scale
                             all_keypoints = kp_data
 
+                        # IoU & Overlap Deduplication: eliminate duplicate detections of the same individual
+                        if len(scaled_boxes) > 1:
+                            keep_idx = []
+                            sorted_idx = sorted(range(len(confs)), key=lambda k: confs[k], reverse=True)
+                            for s_i in sorted_idx:
+                                b_s = scaled_boxes[s_i]
+                                is_dup = False
+                                for k_i in keep_idx:
+                                    b_k = scaled_boxes[k_i]
+                                    ix1 = max(b_s[0], b_k[0])
+                                    iy1 = max(b_s[1], b_k[1])
+                                    ix2 = min(b_s[2], b_k[2])
+                                    iy2 = min(b_s[3], b_k[3])
+                                    if ix2 > ix1 and iy2 > iy1:
+                                        inter_area = (ix2 - ix1) * (iy2 - iy1)
+                                        area_s = (b_s[2] - b_s[0]) * (b_s[3] - b_s[1])
+                                        area_k = (b_k[2] - b_k[0]) * (b_k[3] - b_k[1])
+                                        union_area = area_s + area_k - inter_area
+                                        iou = inter_area / union_area if union_area > 0 else 0
+                                        overlap = inter_area / min(area_s, area_k) if min(area_s, area_k) > 0 else 0
+                                        if iou > 0.35 or overlap > 0.60:
+                                            is_dup = True
+                                            break
+                                if not is_dup:
+                                    keep_idx.append(s_i)
+                            
+                            scaled_boxes = [scaled_boxes[k] for k in keep_idx]
+                            track_ids = [track_ids[k] for k in keep_idx]
+                            class_ids = [class_ids[k] for k in keep_idx]
+                            confs = [confs[k] for k in keep_idx]
+                            if all_keypoints is not None and len(all_keypoints) > 0:
+                                all_keypoints = [all_keypoints[k] for k in keep_idx]
+
                         last_draw_data = {
                             'boxes': scaled_boxes,
                             'track_ids': track_ids,
@@ -698,7 +731,6 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                                 h, w = frame.shape[:2]
                                 ptz_controller.track_target(cx, cy, w, h)
                                 ptz_target_tracked = True
-                                cv2.drawMarker(annotated_frame, (int(cx), int(cy)), (0, 255, 255), cv2.MARKER_CROSS, 25, 2)
                                             
                     # Cross-Camera Exit Detection
                     if frame_counter % yolo_interval == 0:

@@ -15,7 +15,7 @@ import {
   Sun,
   Moon,
 } from 'lucide-react'
-import { speechSiren } from '../utils/speechSiren.js'
+import { speechSiren } from '../utils/speechSiren'
 
 function ShieldEmblem() {
   return (

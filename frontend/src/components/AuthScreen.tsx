@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { ShieldCheck, Mail, Lock, ArrowRight, Loader2, KeyRound, Smartphone, ChevronLeft, RefreshCw, CheckCircle2, ShieldAlert, Building, Send, Check, X } from 'lucide-react'
-import { safeFetch, BACKEND_URL, AI_URL } from '../utils/api.js'
+import { safeFetch, BACKEND_URL, AI_URL } from '../utils/api'
 
 const DEFAULT_OPERATORS = [
   { badge_id: 'SEC-OP-1024-A', pin: '1234', name: 'Nimal Silva', is_active: 1 },

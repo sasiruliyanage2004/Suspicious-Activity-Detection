@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Tv, X } from 'lucide-react'
-import CameraTile from './CameraTile.jsx'
-import CameraExpandedView from './CameraExpandedView.jsx'
+import CameraTile from './CameraTile'
+import CameraExpandedView from './CameraExpandedView'
 
 export default function TVWallMode({ cameras, onExit, onRename }) {
   const [expanded, setExpanded] = useState(null)

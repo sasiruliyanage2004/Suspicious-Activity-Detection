@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { ChartNoAxesCombined, TrendingUp, Users, ShieldCheck, Activity, Eye, Zap, Calendar, Filter, MapPin, Layers, RefreshCw, CheckCircle2 } from 'lucide-react'
-import { safeFetch, BACKEND_URL } from '../utils/api.js'
+import { safeFetch, BACKEND_URL } from '../utils/api'
 
 const DEMO_FALLBACK_ALERTS = [
   { id: 1, camera_id: 'CAM-01', behavior_type: 'Suspicious Loitering', timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), confidence: 0.94 },

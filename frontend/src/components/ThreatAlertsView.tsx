@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { ShieldAlert, Search, Filter, AlertTriangle, CheckCircle, Clock, Camera, Download, RefreshCw, Video, Play, Maximize2, X, Calendar, MapPin, Radio, Film, ExternalLink, FileText } from 'lucide-react'
-import { speechSiren } from '../utils/speechSiren.js'
-import { safeFetch, BACKEND_URL, getWsUrl } from '../utils/api.js'
+import { speechSiren } from '../utils/speechSiren'
+import { safeFetch, BACKEND_URL, getWsUrl } from '../utils/api'
 
 export default function ThreatAlertsView({ cameras = [] }) {
   const [searchTerm, setSearchTerm] = useState('')

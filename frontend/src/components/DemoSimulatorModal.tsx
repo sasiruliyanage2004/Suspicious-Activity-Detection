@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Zap, ShieldAlert, AlertTriangle, UserX, Crosshair, Package, Play, CheckCircle2, X, Send, Volume2 } from 'lucide-react'
-import { speechSiren } from '../utils/speechSiren.js'
+import { speechSiren } from '../utils/speechSiren'
 
 const THREAT_PRESETS = [
   {

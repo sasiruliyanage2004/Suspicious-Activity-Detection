@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import CameraTile from './CameraTile.jsx'
-import { safeFetch, AI_URL } from '../utils/api.js'
+import CameraTile from './CameraTile'
+import { safeFetch, AI_URL } from '../utils/api'
 
 export default function CameraGrid({ cameras, onExpand, onRename, onRemove }) {
   const [personCounts, setPersonCounts] = useState({})

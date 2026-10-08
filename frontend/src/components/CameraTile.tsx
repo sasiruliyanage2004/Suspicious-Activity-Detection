@@ -1,7 +1,7 @@
 import React, { useState, memo } from 'react'
 import { Pencil, Check, TriangleAlert, Video, Radio, Activity, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Crosshair } from 'lucide-react'
-import { playBleep } from '../utils/sounds.js'
-import AiVisionFeed from './AiVisionFeed.jsx'
+import { playBleep } from '../utils/sounds'
+import AiVisionFeed from './AiVisionFeed'
 
 function FeedBackdrop({ seed = 0, cameraCode, location }) {
   const hue = (seed * 47) % 360

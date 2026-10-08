@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Settings2, Building, Sliders, Send, ShieldCheck, Key, BrainCircuit, ToggleLeft, ToggleRight, Lock, Users, CheckCircle, AlertTriangle, ShieldAlert } from 'lucide-react'
-import DualControlModal from './DualControlModal.jsx'
+import DualControlModal from './DualControlModal'
 
 export default function NodeSettingsView({ sensitivity, onSensitivityChange }) {
   const [license, setLicense] = useState({

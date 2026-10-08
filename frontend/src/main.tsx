@@ -1,8 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
+import App from './App'
 import './index.css'
-import { ToastProvider } from './components/ToastContext.jsx'
+import { ToastProvider } from './components/ToastContext'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ToastProvider>

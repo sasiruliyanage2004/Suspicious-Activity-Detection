@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { Camera, ShieldAlert, ScanEye, Activity, TriangleAlert, Cpu, Radio, CheckCircle, PlusCircle, RefreshCw, X, Wifi } from 'lucide-react'
-import MetricCard from './MetricCard.jsx'
-import CameraGrid from './CameraGrid.jsx'
-import ActivityLog from './ActivityLog.jsx'
-import { safeFetch, AI_URL } from '../utils/api.js'
+import MetricCard from './MetricCard'
+import CameraGrid from './CameraGrid'
+import ActivityLog from './ActivityLog'
+import { safeFetch, AI_URL } from '../utils/api'
 
 export default function Dashboard({ cameras, onExpandCamera, onRename, onProvision, onRemove }) {
   const [showDiscoveryModal, setShowDiscoveryModal] = useState(false)

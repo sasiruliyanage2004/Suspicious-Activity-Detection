@@ -100,67 +100,86 @@ class AttributeRecognizer:
 
     def draw_attribute_badge(self, image, box, attributes, track_id=None):
         """
-        Draws responsive cyber command HUD text (Cinematic Typewriter Effect) without solid backgrounds.
+        Draws responsive cyber command HUD badge with frosted glass backing & tactical corners.
         """
+        h_img, w_img = image.shape[:2]
         x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
+        x1, y1 = max(2, x1), max(2, y1)
+        x2, y2 = min(w_img - 2, x2), min(h_img - 2, y2)
         
         status = attributes[-1] if len(attributes) > 0 else "UNRECOGNIZED"
         lines = attributes[:-1] if len(attributes) > 1 else attributes
 
-        # Typewriter effect logic
-        import time
-        if not hasattr(self, '_person_times'):
-            self._person_times = {}
-            
-        if track_id is not None:
-            if track_id not in self._person_times:
-                self._person_times[track_id] = time.time()
-            elapsed = time.time() - self._person_times[track_id]
-            chars_to_show = int(elapsed * 25) # 25 chars per second
-        else:
-            chars_to_show = 999
-
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.55
+        font_scale = 0.50
         thickness = 1
         line_height = 20
-        padding = 4
+        padding_x = 8
+        padding_y = 6
 
         # Dynamic color schemes
         if status == "CRIMINAL_WATCHLIST":
-            text_color = (50, 50, 255)     # Red
+            text_color = (80, 80, 255)      # Bright Red
             box_color = (0, 0, 255)
+            badge_bg = (20, 10, 40)
         elif status == "AUTHORIZED_STAFF":
-            text_color = (150, 255, 150)   # Light Green
-            box_color = (0, 255, 120)
+            text_color = (130, 255, 160)    # Emerald Neon
+            box_color = (0, 230, 120)
+            badge_bg = (10, 35, 20)
         else:
-            text_color = (255, 230, 180)   # Light Cyan/Amber
-            box_color = (0, 235, 255)
+            text_color = (255, 235, 175)    # Cyber Cyan / Amber
+            box_color = (0, 225, 255)
+            badge_bg = (12, 20, 28)
 
-        # Draw typewriter text
-        current_char_count = 0
+        # Measure text width
+        max_text_w = 0
+        for line in lines:
+            (tw, th), _ = cv2.getTextSize(line, font, font_scale, thickness)
+            if tw > max_text_w:
+                max_text_w = tw
+
+        badge_w = max_text_w + (padding_x * 2)
+        badge_h = (len(lines) * line_height) + (padding_y * 2)
+
+        # Position badge above bounding box (or inside if near ceiling)
+        if y1 - badge_h - 4 >= 4:
+            by1 = y1 - badge_h - 4
+            by2 = y1 - 4
+        else:
+            by1 = y1 + 4
+            by2 = y1 + 4 + badge_h
+
+        bx1 = x1
+        bx2 = min(w_img - 4, bx1 + badge_w)
+
+        # Render sleek translucent HUD badge backing
+        overlay = image.copy()
+        cv2.rectangle(overlay, (bx1, by1), (bx2, by2), badge_bg, -1)
+        cv2.addWeighted(overlay, 0.78, image, 0.22, 0, image)
         
-        # Start text slightly above the box
-        start_y = max(20, y1 - (len(lines) * line_height) - 5)
+        # Subtle tactical border on the badge
+        cv2.rectangle(image, (bx1, by1), (bx2, by2), box_color, 1)
 
+        # Render badge text cleanly
         for idx, line in enumerate(lines):
-            line_len = len(line)
-            if current_char_count >= chars_to_show:
-                break
-                
-            chars_left = chars_to_show - current_char_count
-            text_to_draw = line[:chars_left]
-            
-            ty = start_y + (idx * line_height)
-            
-            # Draw cinematic drop shadow / outline for visibility without background
-            cv2.putText(image, text_to_draw, (x1, ty), font, font_scale, (10, 10, 10), thickness + 2, cv2.LINE_AA)
-            cv2.putText(image, text_to_draw, (x1, ty), font, font_scale, text_color, thickness, cv2.LINE_AA)
-            
-            current_char_count += line_len
+            ty = by1 + padding_y + (idx * line_height) + 13
+            cv2.putText(image, line, (bx1 + padding_x, ty), font, font_scale, text_color, thickness, cv2.LINE_AA)
 
-        # Draw thin bounding box
+        # Draw sleek tactical bounding box with corner brackets
         cv2.rectangle(image, (x1, y1), (x2, y2), box_color, 1)
+        c_len = min(20, max(8, int((x2 - x1) * 0.15)), int((y2 - y1) * 0.15))
+        # Top-Left corner
+        cv2.line(image, (x1, y1), (x1 + c_len, y1), box_color, 3)
+        cv2.line(image, (x1, y1), (x1, y1 + c_len), box_color, 3)
+        # Top-Right corner
+        cv2.line(image, (x2, y1), (x2 - c_len, y1), box_color, 3)
+        cv2.line(image, (x2, y1), (x2, y1 + c_len), box_color, 3)
+        # Bottom-Left corner
+        cv2.line(image, (x1, y2), (x1 + c_len, y2), box_color, 3)
+        cv2.line(image, (x1, y2), (x1, y2 - c_len), box_color, 3)
+        # Bottom-Right corner
+        cv2.line(image, (x2, y2), (x2 - c_len, y2), box_color, 3)
+        cv2.line(image, (x2, y2), (x2, y2 - c_len), box_color, 3)
 
     def draw_threat_alert_badge(self, image, box, alert_text):
         x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])

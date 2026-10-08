@@ -1,6 +1,6 @@
 import React from 'react'
 import { LayoutGrid, Camera, ShieldAlert, ChartNoAxesCombined, ScanLine, Settings2, Clapperboard, UserCheck, Users } from 'lucide-react'
-import { playBleep } from '../utils/sounds.js'
+import { playBleep } from '../utils/sounds'
 
 const NAV = [
   { key: 'grid', icon: LayoutGrid, label: 'Live Video Dashboard' },
