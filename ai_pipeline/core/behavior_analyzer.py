@@ -202,23 +202,7 @@ class BehaviorAnalyzer:
                 wx1, wy1, wx2, wy2 = box.xyxy[0].cpu().numpy()
                 wx1, wy1, wx2, wy2 = wx1/scale, wy1/scale, wx2/scale, wy2/scale
                 
-                # Check for Head / Face Collision (A human head/face is NOT a handheld weapon!)
-                is_head_false_positive = False
-                if person_boxes is not None and len(person_boxes) > 0:
-                    for pbox in person_boxes:
-                        px1, py1, px2, py2 = pbox
-                        p_w = max(1, px2 - px1)
-                        p_h = max(1, py2 - py1)
-                        # Head area is the top 50% of the person box
-                        head_box = (px1 + p_w * 0.1, py1, px2 - p_w * 0.1, py1 + p_h * 0.50)
-                        wcx, wcy = (wx1 + wx2) / 2, (wy1 + wy2) / 2
-                        if head_box[0] <= wcx <= head_box[2] and head_box[1] <= wcy <= head_box[3]:
-                            is_head_false_positive = True
-                            break
-                            
-                if is_head_false_positive:
-                    continue
-
+                # Valid weapon detected (Knife / Firearm)
                 highest_conf_box = box
                 break
                     
@@ -227,10 +211,6 @@ class BehaviorAnalyzer:
             return None
             
         self.weapon_consecutive_frames += 1
-        
-        # Fast confirmation: 2 passes or immediate if high confidence
-        if self.weapon_consecutive_frames < 2 and highest_conf_box.conf.item() < 0.50:
-            return None
             
         cls_id = int(highest_conf_box.cls.item())
         weapon_type = weapon_results[0].names[cls_id].capitalize()

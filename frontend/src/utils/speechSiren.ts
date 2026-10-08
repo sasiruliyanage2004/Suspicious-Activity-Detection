@@ -111,9 +111,9 @@ class SpeechSirenManager {
       }
 
       utteranceEng.onend = () => {
-        // Play the custom sound AT THE END of the speech for high priority threats
+        // Play clean tactical alert beep at end of speech instead of loud lockdown alarm
         if (isHighPriority && !this.muted && typeof window !== 'undefined') {
-          this.playLockdownSiren();
+          this.playTacticalBeep(650, 0.25, 'sine');
         }
         // Cleanup memory
         if (window.activeSpeechUtterances) {

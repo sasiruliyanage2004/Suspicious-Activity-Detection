@@ -90,10 +90,10 @@ class Detector:
 
             # 2. Vehicle, Luggage & Knife/Weapon tracking (Classes: 1-bicycle, 2-car, 3-motorcycle, 5-bus, 7-truck, 24-backpack, 26-handbag, 28-suitcase, 34-baseball bat, 43-knife, 76-scissors)
             if run_vehicles or run_weapons:
-                if self.frame_count % 3 == 0 or self.last_object_results is None:
+                if self.frame_count % 2 == 0 or self.last_object_results is None:
                     self.last_object_results = self.object_model.track(
                         frame, persist=True, tracker="bytetrack.yaml",
-                        classes=[1, 2, 3, 5, 7, 24, 26, 28, 34, 43, 76], conf=conf_threshold, verbose=False
+                        classes=[1, 2, 3, 5, 7, 24, 26, 28, 34, 43, 76], conf=0.28, verbose=False
                     )
             else:
                 self.last_object_results = None
@@ -101,7 +101,7 @@ class Detector:
             # 3. Dedicated Weapon detection (Gun, Knife)
             if run_weapons and self.weapon_model is not None:
                 if self.frame_count % 2 == 0 or self.last_weapon_results is None:
-                    self.last_weapon_results = self.weapon_model.predict(frame, conf=0.50, verbose=False)
+                    self.last_weapon_results = self.weapon_model.predict(frame, conf=0.28, verbose=False)
             else:
                 self.last_weapon_results = None
 

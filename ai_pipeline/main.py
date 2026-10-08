@@ -625,52 +625,81 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                 all_keypoints = last_draw_data['all_keypoints']
                 weapon_results = last_draw_data['weapon_results']
 
-                # 2. Analyze Weapon Behavior & Draw
+                # 2. WEAPON & DEADLY THREAT PERSISTENCE TRACKER
+                now_w = time.time()
+                if not hasattr(cam_analyzer, '_persisted_weapons'):
+                    cam_analyzer._persisted_weapons = []
+
+                def register_active_threat(box_coords, w_label, w_conf):
+                    bx1, by1, bx2, by2 = box_coords
+                    bcx, bcy = (bx1 + bx2) / 2, (by1 + by2) / 2
+                    found = False
+                    for item in cam_analyzer._persisted_weapons:
+                        ox1, oy1, ox2, oy2 = item['box']
+                        ocx, ocy = (ox1 + ox2) / 2, (oy1 + oy2) / 2
+                        dist = ((bcx - ocx)**2 + (bcy - ocy)**2)**0.5
+                        if dist < 220:
+                            item['box'] = [
+                                int(0.70 * bx1 + 0.30 * ox1),
+                                int(0.70 * by1 + 0.30 * oy1),
+                                int(0.70 * bx2 + 0.30 * ox2),
+                                int(0.70 * by2 + 0.30 * oy2)
+                            ]
+                            item['conf'] = max(item['conf'], w_conf)
+                            item['type'] = w_label
+                            item['expire_at'] = now_w + 4.5  # Lock on screen for 4.5 seconds
+                            found = True
+                            break
+                    if not found:
+                        cam_analyzer._persisted_weapons.append({
+                            'box': [int(bx1), int(by1), int(bx2), int(by2)],
+                            'type': w_label,
+                            'conf': w_conf,
+                            'expire_at': now_w + 4.5
+                        })
+
+                # A. Detect from Custom Weapon Model (Guns, Knives)
                 if weapon_results and len(weapon_results) > 0 and weapon_results[0].boxes is not None and len(weapon_results[0].boxes) > 0:
-                    weapon_alert = cam_analyzer.analyze_weapons(weapon_results, threshold=GLOBAL_WEAPON_THRESHOLD, person_boxes=boxes, scale=scale)
-                    if weapon_alert and weapon_alert.get("is_new"):
-                        res = api.send_alert(
-                            camera_id=camera_id,
-                            behavior_type=weapon_alert["behavior"],
-                            confidence=weapon_alert["confidence"],
-                            details=weapon_alert["details"]
-                        )
-                        clip_url = res[0] if res else ""
-                        notifier.send_alert(
-                            f"🔫 <b>CRITICAL ARMED THREAT:</b> {weapon_alert['behavior']} detected on {camera_id}\nConfidence: {weapon_alert['confidence']*100:.1f}%",
-                            annotated_frame,
-                            clip_url,
-                            category="weapon"
-                        )
-                    if weapon_alert and weapon_alert.get("box") is not None:
-                        wbox = weapon_alert["box"]
-                        wcls_id = int(wbox.cls.item())
-                        weapon_type = weapon_results[0].names[wcls_id].upper()
-                        if weapon_type.lower() in ['gun', 'knife', 'pistol', 'firearm', 'dagger']:
+                    for wbox in weapon_results[0].boxes:
+                        w_conf = float(wbox.conf.item())
+                        w_cls = int(wbox.cls.item())
+                        w_name = weapon_results[0].names[w_cls].lower()
+                        if w_name in ['knife', 'gun', 'pistol', 'firearm', 'dagger'] and w_conf >= 0.28:
                             wx1, wy1, wx2, wy2 = wbox.xyxy[0].cpu().numpy()
-                            # Scale weapon box if needed
                             if 'scale' in locals() and scale < 1.0:
                                 wx1, wy1, wx2, wy2 = wx1/scale, wy1/scale, wx2/scale, wy2/scale
-                            cv2.rectangle(annotated_frame, (int(wx1), int(wy1)), (int(wx2), int(wy2)), (0, 0, 255), 4)
-                            cv2.putText(annotated_frame, f"WEAPON: {weapon_type}", (int(wx1), int(wy1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+                            label_str = "Knife" if w_name in ['knife', 'dagger'] else "Firearm"
+                            register_active_threat([wx1, wy1, wx2, wy2], label_str, w_conf)
 
-                # 2b. Draw Vehicle & Weapon Detections
+                            if not hasattr(cam_analyzer, '_last_weapon_dispatch') or now_w - cam_analyzer._last_weapon_dispatch > 8.0:
+                                cam_analyzer._last_weapon_dispatch = now_w
+                                res = api.send_alert(
+                                    camera_id=camera_id,
+                                    behavior_type=f"{label_str} Detected",
+                                    confidence=float(w_conf),
+                                    details=f"Active armed threat confirmed: {label_str} (Confidence: {w_conf*100:.1f}%)"
+                                )
+                                clip_url = res[0] if res else ""
+                                notifier.send_alert(
+                                    f"🚨 <b>ARMED THREAT DETECTED:</b> {label_str} on {camera_id}\nConfidence: {w_conf*100:.1f}%",
+                                    annotated_frame,
+                                    clip_url,
+                                    category="weapon"
+                                )
+
+                # B. Detect from Object Tracking Model (Class 43: Knife, 76: Scissors, 34: Baseball Bat)
                 v_boxes = last_draw_data.get('vehicle_boxes', [])
                 v_classes = last_draw_data.get('vehicle_classes', [])
                 v_confs = last_draw_data.get('vehicle_confs', [])
                 v_ids = last_draw_data.get('vehicle_ids', [])
                 
                 for v_box, v_cls, v_conf, v_id in zip(v_boxes, v_classes, v_confs, v_ids):
-                    # Handle Knives & Sharp/Blunt Weapons detected by YOLO object model (Class 43: Knife, 76: Scissors, 34: Baseball Bat)
-                    if v_cls in [34, 43, 76] and v_conf >= 0.40:
+                    if v_cls in [34, 43, 76] and v_conf >= 0.28:
                         w_label = "Knife" if v_cls == 43 else ("Scissors" if v_cls == 76 else "Bat / Club")
-                        vx1, vy1, vx2, vy2 = [int(v) for v in v_box]
-                        cv2.rectangle(annotated_frame, (vx1, vy1), (vx2, vy2), (0, 0, 255), 4)
-                        cv2.putText(annotated_frame, f"WEAPON: {w_label.upper()}", (vx1, max(15, vy1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
-                        
-                        # Throttle weapon alert to once every 10 seconds per camera
-                        now_w = time.time()
-                        if not hasattr(cam_analyzer, '_last_knife_alert') or now_w - cam_analyzer._last_knife_alert > 10.0:
+                        vx1, wy1, vx2, vy2 = [int(v) for v in v_box]
+                        register_active_threat([vx1, vy1, vx2, vy2], w_label, float(v_conf))
+
+                        if not hasattr(cam_analyzer, '_last_knife_alert') or now_w - cam_analyzer._last_knife_alert > 8.0:
                             cam_analyzer._last_knife_alert = now_w
                             res = api.send_alert(
                                 camera_id=camera_id,
@@ -919,37 +948,34 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                         cv2.putText(annotated_frame, f"ZONE: {label.upper()}", (zx1, max(22, zy1 - 8)), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.65, color, 2)
                 
-                # Render weapon detection results on top
-                if weapon_results and len(weapon_results) > 0 and weapon_results[0].boxes is not None and len(weapon_results[0].boxes) > 0:
-                    for box in weapon_results[0].boxes:
-                        if box.conf.item() > GLOBAL_WEAPON_THRESHOLD:
-                            cls_id = int(box.cls.item())
-                            raw_w_name = weapon_results[0].names[cls_id].lower()
-                            # Strict filter: Only allow genuine firearm or bladed weapon threats; suppress false positives like grenade/head
-                            if raw_w_name not in ['gun', 'knife', 'pistol', 'firearm', 'dagger']:
-                                continue
-                            
-                            x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                            if 'scale' in locals() and scale < 1.0:
-                                x1, y1, x2, y2 = x1/scale, y1/scale, x2/scale, y2/scale
+                # Render Persisted Active Weapon Threat Boxes (Persistent Hold Time - Never Flickers)
+                if hasattr(cam_analyzer, '_persisted_weapons'):
+                    now_render = time.time()
+                    cam_analyzer._persisted_weapons = [w for w in cam_analyzer._persisted_weapons if now_render < w['expire_at']]
+                    for pw in cam_analyzer._persisted_weapons:
+                        x1, y1, x2, y2 = pw['box']
+                        # High-visibility Tactical Red Threat Box
+                        cv2.rectangle(annotated_frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 4)
 
-                            # Suppress if weapon box overlaps human head/face area
-                            is_head = False
-                            if boxes is not None and len(boxes) > 0:
-                                wcx, wcy = (x1 + x2) / 2, (y1 + y2) / 2
-                                for pbox in boxes:
-                                    px1, py1, px2, py2 = pbox
-                                    pw = max(1, px2 - px1)
-                                    ph = max(1, py2 - py1)
-                                    if (px1 + pw * 0.1) <= wcx <= (px2 - pw * 0.1) and py1 <= wcy <= (py1 + ph * 0.50):
-                                        is_head = True
-                                        break
-                            if is_head:
-                                continue
+                        # Corner brackets
+                        blen = min(int(abs(x2 - x1) * 0.25), 24)
+                        cv2.line(annotated_frame, (int(x1), int(y1)), (int(x1) + blen, int(y1)), (0, 0, 255), 5)
+                        cv2.line(annotated_frame, (int(x1), int(y1)), (int(x1), int(y1) + blen), (0, 0, 255), 5)
+                        cv2.line(annotated_frame, (int(x2), int(y1)), (int(x2) - blen, int(y1)), (0, 0, 255), 5)
+                        cv2.line(annotated_frame, (int(x2), int(y1)), (int(x2), int(y1) + blen), (0, 0, 255), 5)
+                        cv2.line(annotated_frame, (int(x1), int(y2)), (int(x1) + blen, int(y2)), (0, 0, 255), 5)
+                        cv2.line(annotated_frame, (int(x1), int(y2)), (int(x1), int(y2) - blen), (0, 0, 255), 5)
+                        cv2.line(annotated_frame, (int(x2), int(y2)), (int(x2) - blen, int(y2)), (0, 0, 255), 5)
+                        cv2.line(annotated_frame, (int(x2), int(y2)), (int(x2), int(y2) - blen), (0, 0, 255), 5)
 
-                            weapon_type = weapon_results[0].names[cls_id].upper()
-                            cv2.rectangle(annotated_frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 4)
-                            cv2.putText(annotated_frame, f"WEAPON: {weapon_type}", (int(x1), max(20, int(y1)-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+                        # Tactical Tag Header
+                        tag = f"WEAPON: {pw['type'].upper()} [{int(pw['conf']*100)}%]"
+                        (tw, th), _ = cv2.getTextSize(tag, cv2.FONT_HERSHEY_SIMPLEX, 0.75, 2)
+                        cv2.rectangle(annotated_frame, (int(x1), max(0, int(y1) - th - 12)), (int(x1) + tw + 10, max(0, int(y1))), (0, 0, 255), -1)
+                        cv2.putText(annotated_frame, tag, (int(x1) + 5, max(18, int(y1) - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+                        
+                        # Draw threat badge on the person
+                        attr_recognizer.draw_threat_alert_badge(annotated_frame, (int(x1), int(y1), int(x2), int(y2)), f"Armed: {pw['type']}")
 
                 # 4. Render Emotion Detection Results & Trigger Alerts
                 if enable_emotion and last_emotions:
