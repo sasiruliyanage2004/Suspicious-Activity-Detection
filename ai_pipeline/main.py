@@ -637,9 +637,10 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                         )
                         clip_url = res[0] if res else ""
                         notifier.send_alert(
-                            f"CRITICAL: {weapon_alert['behavior']} detected on {camera_id}",
-                            frame,
-                            clip_url
+                            f"🔫 <b>CRITICAL ARMED THREAT:</b> {weapon_alert['behavior']} detected on {camera_id}\nConfidence: {weapon_alert['confidence']*100:.1f}%",
+                            annotated_frame,
+                            clip_url,
+                            category="weapon"
                         )
                     if weapon_alert and weapon_alert.get("box") is not None:
                         wbox = weapon_alert["box"]
@@ -678,7 +679,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                                 details=f"Active threat detected: {w_label} (Confidence: {v_conf*100:.1f}%)"
                             )
                             clip_url = res[0] if res else ""
-                            notifier.send_alert(f"CRITICAL: {w_label} detected on {camera_id}", annotated_frame, clip_url)
+                            notifier.send_alert(f"🔪 <b>DEADLY WEAPON DETECTED:</b> {w_label} on {camera_id} (Confidence: {v_conf*100:.1f}%)", annotated_frame, clip_url, category="knife")
                         continue
 
                     if v_conf >= 0.60:
@@ -754,15 +755,31 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                                 intersects = not (px2 < zx1 or px1 > zx2 or py2 < zy1 or py1 > zy2)
                                 center_inside = (zx1 <= pcx <= zx2 and zy1 <= pcy <= zy2)
                                 if center_inside or intersects:
-                                    # Trigger Zone Alert!
+                                    # Trigger Zone Alert with intelligent track-based debounce
                                     zone_label = z.get('zone_label', 'RESTRICTED')
+                                    zone_id = z.get('id', zone_label)
+                                    history_key = f"{camera_id}_{track_id}_{zone_id}"
+                                    now_z = time.time()
+                                    if not hasattr(cam_analyzer, '_zone_alert_history'):
+                                        cam_analyzer._zone_alert_history = {}
+                                    last_z_t = cam_analyzer._zone_alert_history.get(history_key, 0)
+                                    is_new_zone = (now_z - last_z_t > 12.0)
+                                    if is_new_zone:
+                                        cam_analyzer._zone_alert_history[history_key] = now_z
+
+                                    zone_behavior = "Tripwire Intrusion" if 'CRITICAL' in z.get('alarm_level', '') else "Warning Zone Entry"
                                     zone_alert = {
-                                        "behavior": "Tripwire Intrusion" if 'CRITICAL' in z.get('alarm_level', '') else "Warning Zone Entry",
+                                        "behavior": zone_behavior,
                                         "confidence": 0.99,
-                                        "details": f"Person {track_id} entered restricted zone: {zone_label}"
+                                        "details": f"Individual ID #{track_id} crossed boundary: {zone_label}",
+                                        "is_new": is_new_zone
                                     }
-                                    if not alert: alert = zone_alert
-                                    else: alert['details'] += f" | Intruding: {zone_label}"
+                                    if not alert:
+                                        alert = zone_alert
+                                    else:
+                                        alert['details'] += f" | Intruding: {zone_label}"
+                                        if is_new_zone:
+                                            alert['is_new'] = True
                             
                             # Detect Person Visual Attributes (Gender, Hair Style, Top Clothing Color) & Draw Cinematic HUD Badge
                             try:
@@ -771,7 +788,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                             except Exception as _e:
                                 pass
                             
-                            # Automatically dispatch 'Person Detected' incident alert with smart enterprise throttling (once per 3 minutes per individual, 30s per camera zone) to maintain zero-spam, highly clean forensic logs
+                            # Automatically dispatch 'Person Detected' incident alert with smart enterprise throttling (once per 60s per individual, 20s per camera zone)
                             now_t = time.time()
                             if not hasattr(cam_analyzer, '_person_alert_timestamps'):
                                 cam_analyzer._person_alert_timestamps = {}
@@ -779,7 +796,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                                 cam_analyzer._last_cam_person_time = 0
                                 
                             last_alert_t = cam_analyzer._person_alert_timestamps.get(track_id, 0)
-                            if (now_t - last_alert_t > 180.0) and (now_t - cam_analyzer._last_cam_person_time > 30.0):
+                            if (now_t - last_alert_t > 60.0) and (now_t - cam_analyzer._last_cam_person_time > 20.0):
                                 try:
                                     res = api.send_alert(
                                         camera_id=camera_id,
@@ -788,7 +805,7 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                                         details=f"Live AI surveillance monitored verified Person ID:{track_id} entering {camera_id} sector."
                                     )
                                     clip_url = res[0] if res else ""
-                                    notifier.send_alert(f"ALERT: Person Detected on {camera_id}", annotated_frame, clip_url)
+                                    notifier.send_alert(f"👤 <b>PERSON DETECTED:</b> Individual #{track_id} entered sector on {camera_id}", annotated_frame, clip_url, category="person")
                                 except Exception:
                                     pass
                                 cam_analyzer._person_alert_timestamps[track_id] = now_t
@@ -804,12 +821,15 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                                         details=alert["details"]
                                     )
                                     clip_url = res[0] if res else ""
-                                    if any(b in alert["behavior"] for b in ["Falling", "Suspicious", "Smoking", "Violence"]):
-                                        notifier.send_alert(
-                                            f"ALERT: {alert['behavior']} detected on {camera_id}",
-                                            annotated_frame,
-                                            clip_url
-                                        )
+                                    
+                                    # Dispatch Telegram alert for Tripwires, Intrusions, and Critical Behaviors
+                                    cat = "tripwire" if "Tripwire" in alert["behavior"] or "Intrusion" in alert["behavior"] else "violence"
+                                    notifier.send_alert(
+                                        f"🚨 <b>{alert['behavior'].upper()}:</b> {alert['details']} on {camera_id}",
+                                        annotated_frame,
+                                        clip_url,
+                                        category=cat
+                                    )
                                 # Draw Red Threat Box & Warning Badge (matches exact design from user screenshot: ! Fight Detected / ! Weapon Detected)
                                 attr_recognizer.draw_threat_alert_badge(annotated_frame, box, alert["behavior"])
                                             
@@ -1252,15 +1272,15 @@ def simulate_threat_event(req: SimulateThreatRequest):
 class OTPRequest(BaseModel):
     code: str
     message: str
-    bot_token: str = "7700244458:AAGoJv9eE8rV1Ehy-S4P1KAsfF0VqK2iWpM"
-    chat_id: str = "6498528994"
+    bot_token: str = "8337361642:AAHkEadKvtWMWnHaLVMnAM1COY97VYPiK-w"
+    chat_id: str = "1331146374"
 
 @app.post("/api/auth/send_otp")
 def send_telegram_otp_pipeline(req: OTPRequest):
     """Redundant failproof Telegram 2FA OTP delivery via Port 8002 pipeline."""
     try:
-        token = req.bot_token or "7700244458:AAGoJv9eE8rV1Ehy-S4P1KAsfF0VqK2iWpM"
-        chat = req.chat_id or "6498528994"
+        token = req.bot_token or "8337361642:AAHkEadKvtWMWnHaLVMnAM1COY97VYPiK-w"
+        chat = req.chat_id or "1331146374"
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         requests.post(url, json={"chat_id": chat, "text": req.message}, timeout=6.0)
     except Exception:

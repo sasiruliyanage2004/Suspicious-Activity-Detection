@@ -142,8 +142,8 @@ export default function AuthScreen({ onAuthenticated }) {
 
   // ── Dispatch Real Telegram OTP Message (Exactly-Once Delivery Waterfall) ────
   const sendTelegramOtp = async (code) => {
-    const botToken = license.telegram_bot_token || DEFAULT_LICENSE.telegram_bot_token || "7700244458:AAGoJv9eE8rV1Ehy-S4P1KAsfF0VqK2iWpM"
-    const chatId = license.telegram_chat_id || DEFAULT_LICENSE.telegram_chat_id || "6498528994"
+    const botToken = license.telegram_bot_token || DEFAULT_LICENSE.telegram_bot_token || "8337361642:AAHkEadKvtWMWnHaLVMnAM1COY97VYPiK-w"
+    const chatId = license.telegram_chat_id || DEFAULT_LICENSE.telegram_chat_id || "1331146374"
     const textMsg = `🔒 AETHRA VISION 2FA OTP CODE: ${code}\nAuthorized Admin Login Attempt for ${license.company_name || 'Aethra Command'}.\nValid for 5 minutes.`
 
     const payload = JSON.stringify({ code: strVal(code), message: textMsg, bot_token: botToken, chat_id: chatId })

@@ -22,6 +22,7 @@ import {
   FlipHorizontal
 } from 'lucide-react'
 import AiVisionFeed from './AiVisionFeed'
+import ZoneDrawer from './ZoneDrawer'
 import { safeFetch, BACKEND_URL, AI_URL } from '../utils/api'
 
 interface CameraExpandedViewProps {

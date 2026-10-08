@@ -4,6 +4,8 @@ import re
 import os
 import hashlib
 import asyncio
+import threading
+import requests
 from typing import Dict, List, Optional
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -154,6 +156,41 @@ class CyberShieldEngine:
                 asyncio.run(self._broadcast_threat(event_dict))
             except Exception:
                 pass
+
+        # Dispatch real-time Telegram notification to Admin
+        self._dispatch_telegram_alert(event_dict)
+
+    def _dispatch_telegram_alert(self, event_dict: dict):
+        now = time.time()
+        if not hasattr(self, '_last_tg_threat_time'):
+            self._last_tg_threat_time = 0.0
+        # Prevent Telegram flood on bursts: 6 seconds cooldown
+        if now - self._last_tg_threat_time < 6.0:
+            return
+        self._last_tg_threat_time = now
+
+        def _send():
+            try:
+                bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "8337361642:AAHkEadKvtWMWnHaLVMnAM1COY97VYPiK-w").strip()
+                chat_id = os.environ.get("TELEGRAM_CHAT_ID", "1331146374").strip()
+                if not (bot_token and chat_id):
+                    return
+                url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                msg = (
+                    f"🛡️ <b>CYBER THREAT INTERCEPTED</b> 🛡️\n\n"
+                    f"🎯 <b>Threat Vector:</b> {event_dict.get('threat_type')}\n"
+                    f"🏷️ <b>MITRE ATT&CK:</b> {event_dict.get('mitre_id', 'T1071')}\n"
+                    f"🌐 <b>Attacker IP:</b> <code>{event_dict.get('ip')}</code>\n"
+                    f"🗺️ <b>Network Zone:</b> {event_dict.get('network_zone', 'Untrusted')}\n"
+                    f"📍 <b>Endpoint:</b> <code>{event_dict.get('path', '')}</code>\n"
+                    f"⚡ <b>Action:</b> Layer-7 WAF Auto-Quarantined\n"
+                    f"⏱️ <i>Time: {event_dict.get('timestamp', '')}</i>"
+                )
+                requests.post(url, json={"chat_id": chat_id, "text": msg, "parse_mode": "HTML"}, timeout=5.0)
+            except Exception:
+                pass
+
+        threading.Thread(target=_send, daemon=True).start()
 
     async def _broadcast_threat(self, event_dict: dict):
         try:

