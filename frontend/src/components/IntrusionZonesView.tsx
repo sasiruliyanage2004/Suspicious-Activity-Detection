@@ -27,27 +27,51 @@ export default function IntrusionZonesView({ cameras = [] }) {
 
   const [zoneName, setZoneName] = useState('')
   const [alarmType, setAlarmType] = useState('CRITICAL_TRIPWIRE')
+  const [toast, setToast] = useState('')
+
+  const flashToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3000)
+  }
 
   // Interactive mouse drawing state
   const [isDrawing, setIsDrawing] = useState(false)
-  const [startPoint, setStartPoint] = useState(null)
-  const [currentRect, setCurrentRect] = useState(null)
-  const canvasContainerRef = useRef(null)
+  const [startPoint, setStartPoint] = useState<any>(null)
+  const [currentRect, setCurrentRect] = useState<any>(null)
+  const canvasContainerRef = useRef<HTMLDivElement>(null)
 
+  // Sync zones to localStorage and live AI Pipeline backend
   useEffect(() => {
     localStorage.setItem('aethra_restricted_zones', JSON.stringify(zones));
+    if (Array.isArray(zones) && zones.length > 0) {
+      zones.forEach((z: any) => {
+        if (z && z.coords) {
+          fetch('http://127.0.0.1:8002/api/zones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: z.id,
+              camera_id: z.camId || 1,
+              zone_label: z.name,
+              coordinates: z.coords,
+              alarm_level: z.type?.includes('Red') ? 'CRITICAL_TRIPWIRE' : 'WARNING_ZONE'
+            })
+          }).catch(() => {})
+        }
+      })
+    }
   }, [zones]);
 
   const camObj = useMemo(() => {
-    return cameras?.find(c => c.id === Number(selectedCam)) || null
+    return cameras?.find((c: any) => c.id === Number(selectedCam)) || null
   }, [cameras, selectedCam])
 
   const camZones = useMemo(() => {
-    return (Array.isArray(zones) ? zones : []).filter(z => z && typeof z === 'object' && z.camId === Number(selectedCam))
+    return (Array.isArray(zones) ? zones : []).filter((z: any) => z && typeof z === 'object' && z.camId === Number(selectedCam))
   }, [zones, selectedCam])
 
   // Handle Mouse Down - start drawing
-  const handleMouseDown = (e) => {
+  const handleMouseDown = (e: React.MouseEvent) => {
     if (!canvasContainerRef.current) return
     const rect = canvasContainerRef.current.getBoundingClientRect()
     const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100))
@@ -58,7 +82,7 @@ export default function IntrusionZonesView({ cameras = [] }) {
   }
 
   // Handle Mouse Move - stretch rectangle/line
-  const handleMouseMove = (e) => {
+  const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDrawing || !startPoint || !canvasContainerRef.current) return
     const rect = canvasContainerRef.current.getBoundingClientRect()
     const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100))
@@ -72,34 +96,34 @@ export default function IntrusionZonesView({ cameras = [] }) {
     })
   }
 
-  // Handle Mouse Up - lock in coordinate box
+  // Handle Mouse Up - lock in coordinate box & auto-fill zone name if blank
   const handleMouseUp = () => {
     if (!isDrawing) return
     setIsDrawing(false)
+    if (!zoneName.trim() && currentRect) {
+      setZoneName(`Restricted Zone ${camZones.length + 1}`)
+    }
   }
 
-  const handleAddZone = (e) => {
+  const handleAddZone = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!zoneName.trim()) {
-      alert('Please provide a Zone Name (e.g. Server Room Gate) before saving.')
-      return
-    }
     if (!currentRect || Math.abs(currentRect.x2 - currentRect.x1) < 2) {
-      alert('Please click and drag across the video preview on the left to draw your custom restricted box first!')
+      flashToast('⚠️ Please click and drag on the camera video preview to draw your zone box!')
       return
     }
+
+    const finalName = zoneName.trim() || `Restricted Zone ${camZones.length + 1}`
+    const x1 = Math.round(Math.min(currentRect.x1, currentRect.x2))
+    const x2 = Math.round(Math.max(currentRect.x1, currentRect.x2))
+    const y1 = Math.round(Math.min(currentRect.y1, currentRect.y2))
+    const y2 = Math.round(Math.max(currentRect.y1, currentRect.y2))
 
     const newZone = {
       id: Date.now(),
       camId: Number(selectedCam),
-      name: zoneName.trim(),
+      name: finalName,
       type: alarmType === 'CRITICAL_TRIPWIRE' ? 'High Security (Red Zone)' : 'Warning (Yellow Zone)',
-      coords: {
-        x1: Math.round(currentRect.x1),
-        y1: Math.round(currentRect.y1),
-        x2: Math.round(currentRect.x2),
-        y2: Math.round(currentRect.y2)
-      },
+      coords: { x1, y1, x2, y2 },
       camera: camObj ? `${camObj.code} (${camObj.location})` : `CAM-0${selectedCam}`
     }
 
@@ -107,6 +131,7 @@ export default function IntrusionZonesView({ cameras = [] }) {
     setZones(updated)
     setZoneName('')
     setCurrentRect(null)
+    flashToast(`🛡️ Active Zone "${finalName}" successfully armed & activated!`)
 
     // Notify backend AI detection engine of new perimeter coordinates
     fetch('http://127.0.0.1:8002/api/zones', {
@@ -119,18 +144,22 @@ export default function IntrusionZonesView({ cameras = [] }) {
         coordinates: newZone.coords,
         alarm_level: alarmType
       })
-    }).catch(() => {
-      // Offline fallback note: Zone stored in active frontend runtime memory and localStorage
-    })
+    }).catch(() => {})
   }
 
-  const handleDeleteZone = (id) => {
-    setZones(prev => prev.filter(z => z.id !== id))
+  const handleDeleteZone = (id: any) => {
+    setZones((prev: any) => prev.filter((z: any) => z.id !== id))
     fetch(`http://127.0.0.1:8002/api/zones/${id}`, { method: 'DELETE' }).catch(() => {})
+    flashToast('🗑️ Zone removed')
   }
 
   return (
-    <div className="flex-1 min-w-0 p-6 space-y-6 animate-fade-in text-gray-200 font-sans">
+    <div className="flex-1 min-w-0 p-6 space-y-6 animate-fade-in text-gray-200 font-sans relative">
+      {toast && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-cyan-400 text-obsidian-950 font-bold text-xs animate-rise z-50 shadow-[0_0_20px_rgba(0,255,255,0.6)]">
+          {toast}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/10 pb-5">
         <div>
           <h1 className="text-xl font-display font-bold text-white flex items-center gap-2.5 uppercase tracking-wider">
@@ -289,14 +318,19 @@ export default function IntrusionZonesView({ cameras = [] }) {
                     setSelectedCam(Number(e.target.value))
                     setCurrentRect(null)
                   }}
-                  className="bg-obsidian-800 border border-white/15 text-xs font-mono text-white font-semibold rounded-xl px-3 py-2.5 outline-none cursor-pointer focus:border-cyan-400 transition-all"
+                  style={{ backgroundColor: '#090e1a', color: '#ffffff' }}
+                  className="bg-[#090e1a] border border-cyan-400/40 text-xs font-mono text-white font-semibold rounded-xl px-3 py-2.5 outline-none cursor-pointer focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all shadow-md"
                 >
                   {cameras?.length > 0 ? (
-                    cameras.map(c => (
-                      <option key={c.id} value={c.id}>{c.code} &mdash; {c.location}</option>
+                    cameras.map((c: any) => (
+                      <option key={c.id} value={c.id} style={{ backgroundColor: '#090e1a', color: '#ffffff' }}>
+                        {c.code} &mdash; {c.location}
+                      </option>
                     ))
                   ) : (
-                    <option value="1">CAM-01 (Main Gate)</option>
+                    <option value="1" style={{ backgroundColor: '#090e1a', color: '#ffffff' }}>
+                      CAM-01 (Main Gate)
+                    </option>
                   )}
                 </select>
               </div>
@@ -308,7 +342,8 @@ export default function IntrusionZonesView({ cameras = [] }) {
                   placeholder="e.g. Vault Entrance Doorway"
                   value={zoneName}
                   onChange={(e) => setZoneName(e.target.value)}
-                  className="bg-obsidian-800 border border-white/15 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white outline-none focus:border-cyan-400 transition-all placeholder:text-gray-600 font-medium"
+                  style={{ backgroundColor: '#090e1a', color: '#ffffff' }}
+                  className="bg-[#090e1a] border border-white/20 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all placeholder:text-gray-500 font-medium"
                 />
               </div>
 

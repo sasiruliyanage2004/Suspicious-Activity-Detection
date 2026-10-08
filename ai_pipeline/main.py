@@ -7,6 +7,7 @@ import time
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
 
 from fastapi import FastAPI, HTTPException
+from typing import Union, Optional
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -144,31 +145,49 @@ def toggle_mirror(camera_id: str):
 
 CAMERA_ZONES = {}
 
-class ZoneCoords(BaseModel):
-    x1: float
-    y1: float
-    x2: float
-    y2: float
-
 class ZoneData(BaseModel):
-    id: int = None
-    camera_id: int
+    id: Optional[Union[int, str]] = None
+    camera_id: Union[int, str]
     zone_label: str
     coordinates: dict
-    alarm_level: str
+    alarm_level: str = "CRITICAL_TRIPWIRE"
+
+def get_camera_zones(camera_id: str):
+    cid_norm = str(camera_id).upper().replace("-", "").replace(" ", "").replace("_", "")
+    matched_zones = []
+    seen_ids = set()
+    for k, zone_list in CAMERA_ZONES.items():
+        k_norm = str(k).upper().replace("-", "").replace(" ", "").replace("_", "")
+        is_match = (k_norm == cid_norm)
+        if not is_match:
+            if ("1" in k_norm or "CAM01" in k_norm or "WEBCAM" in k_norm) and ("1" in cid_norm or "CAM01" in cid_norm or "WEBCAM" in cid_norm):
+                is_match = True
+            elif ("2" in k_norm or "CAM02" in k_norm) and ("2" in cid_norm or "CAM02" in cid_norm):
+                is_match = True
+        if is_match:
+            for z in zone_list:
+                z_id = str(z.get('id', ''))
+                if z_id not in seen_ids:
+                    seen_ids.add(z_id)
+                    matched_zones.append(z)
+    return matched_zones
 
 @app.post("/api/zones")
 def add_zone(data: ZoneData):
     cid = str(data.camera_id)
     if cid not in CAMERA_ZONES:
         CAMERA_ZONES[cid] = []
-    # Add new zone to camera's list
+    CAMERA_ZONES[cid] = [z for z in CAMERA_ZONES[cid] if str(z.get('id', '')) != str(data.id) and z.get('zone_label') != data.zone_label]
     CAMERA_ZONES[cid].append(data.dict())
-    return {"status": "success"}
+    print(f"[ZONES] Saved Zone '{data.zone_label}' for Camera {data.camera_id}: {data.coordinates}")
+    return {"status": "success", "zones": CAMERA_ZONES[cid]}
+
+@app.get("/api/zones/{camera_id}")
+def get_zones(camera_id: str):
+    return {"status": "success", "zones": get_camera_zones(camera_id)}
 
 @app.delete("/api/zones/{zone_id}")
 def delete_zone(zone_id: str):
-    # Frontend sends timestamp id, we can search and remove it
     for cid, zones in CAMERA_ZONES.items():
         CAMERA_ZONES[cid] = [z for z in zones if str(z.get('id', '')) != str(zone_id)]
     return {"status": "success"}
@@ -449,10 +468,10 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                 if is_camera_flipped(camera_id):
                     frame = cv2.flip(frame, 1)
                 
-                if frame_counter % 30 == 0:
-                    current_zones = CAMERA_ZONES.get(str(camera_id), [])
+                if frame_counter % 15 == 0:
+                    current_zones = get_camera_zones(camera_id)
                 elif 'current_zones' not in locals():
-                    current_zones = []
+                    current_zones = get_camera_zones(camera_id)
                 
                 frame_counter += 1
                 
@@ -686,22 +705,28 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                             
                             # Custom Restricted Zone Intrusion Detection
                             for z in current_zones:
-                                zc = z['coordinates']
+                                zc = z.get('coordinates', {})
+                                if not zc: continue
                                 h_f, w_f = annotated_frame.shape[:2]
-                                zx1, zy1 = zc['x1'] * w_f / 100, zc['y1'] * h_f / 100
-                                zx2, zy2 = zc['x2'] * w_f / 100, zc['y2'] * h_f / 100
-                                # Check if person box center is inside the restricted zone
+                                zx1 = min(zc.get('x1', 0), zc.get('x2', 0)) * w_f / 100
+                                zx2 = max(zc.get('x1', 0), zc.get('x2', 0)) * w_f / 100
+                                zy1 = min(zc.get('y1', 0), zc.get('y2', 0)) * h_f / 100
+                                zy2 = max(zc.get('y1', 0), zc.get('y2', 0)) * h_f / 100
+                                # Check if person intersects or center is inside the restricted zone
                                 px1, py1, px2, py2 = box
                                 pcx, pcy = (px1 + px2) / 2, (py1 + py2) / 2
-                                if zx1 <= pcx <= zx2 and zy1 <= pcy <= zy2:
+                                intersects = not (px2 < zx1 or px1 > zx2 or py2 < zy1 or py1 > zy2)
+                                center_inside = (zx1 <= pcx <= zx2 and zy1 <= pcy <= zy2)
+                                if center_inside or intersects:
                                     # Trigger Zone Alert!
+                                    zone_label = z.get('zone_label', 'RESTRICTED')
                                     zone_alert = {
                                         "behavior": "Tripwire Intrusion" if 'CRITICAL' in z.get('alarm_level', '') else "Warning Zone Entry",
                                         "confidence": 0.99,
-                                        "details": f"Person {track_id} entered restricted zone: {z.get('zone_label')}"
+                                        "details": f"Person {track_id} entered restricted zone: {zone_label}"
                                     }
                                     if not alert: alert = zone_alert
-                                    else: alert['details'] += f" | Intruding: {z.get('zone_label')}"
+                                    else: alert['details'] += f" | Intruding: {zone_label}"
                             
                             # Detect Person Visual Attributes (Gender, Hair Style, Top Clothing Color) & Draw Cinematic HUD Badge
                             try:
@@ -825,15 +850,18 @@ def generate_frames(camera_url, camera_id, ptz_controller=None, cam_analyzer=Non
                 # Draw dynamic intrusion zones from frontend
                 if current_zones:
                     for z in current_zones:
-                        zc = z['coordinates']
+                        zc = z.get('coordinates', {})
+                        if not zc: continue
                         h_f, w_f = annotated_frame.shape[:2]
-                        zx1, zy1 = int(zc['x1'] * w_f / 100), int(zc['y1'] * h_f / 100)
-                        zx2, zy2 = int(zc['x2'] * w_f / 100), int(zc['y2'] * h_f / 100)
-                        color = (0, 0, 255) if 'CRITICAL' in z.get('alarm_level', '') else (0, 165, 255)
-                        cv2.rectangle(annotated_frame, (zx1, zy1), (zx2, zy2), color, 3)
+                        zx1 = int(min(zc.get('x1', 0), zc.get('x2', 0)) * w_f / 100)
+                        zy1 = int(min(zc.get('y1', 0), zc.get('y2', 0)) * h_f / 100)
+                        zx2 = int(max(zc.get('x1', 0), zc.get('x2', 0)) * w_f / 100)
+                        zy2 = int(max(zc.get('y1', 0), zc.get('y2', 0)) * h_f / 100)
+                        color = (0, 0, 255) if 'CRITICAL' in z.get('alarm_level', '') else (0, 215, 255)
+                        cv2.rectangle(annotated_frame, (zx1, zy1), (zx2, zy2), color, 2)
                         label = z.get('zone_label', 'RESTRICTED')
-                        cv2.putText(annotated_frame, f"ZONE: {label.upper()}", (zx1, zy1 - 10), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+                        cv2.putText(annotated_frame, f"ZONE: {label.upper()}", (zx1, max(22, zy1 - 8)), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, color, 2)
                 
                 # Render weapon detection results on top
                 if weapon_results and len(weapon_results) > 0 and weapon_results[0].boxes is not None and len(weapon_results[0].boxes) > 0:
