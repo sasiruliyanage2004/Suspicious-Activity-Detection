@@ -22,8 +22,8 @@ import CyberShieldView from './components/CyberShieldView'
 import { useToast } from './components/ToastContext'
 
 const INITIAL_CAMERAS = [
-  { id: 1, code: 'CAM-01', location: 'Main Entrance Gate', streamUrl: 'http://127.0.0.1:8002/api/video_feed/1', attributes: [], threat: null },
-  { id: 2, code: 'CAM-02', location: 'North Parking Lot', streamUrl: 'http://127.0.0.1:8002/api/video_feed/2', attributes: [], threat: null },
+  { id: 1, code: 'CAM-01', location: 'Main Entrance Gate', streamUrl: `${AI_URL}/api/video_feed/1`, attributes: [], threat: null },
+  { id: 2, code: 'CAM-02', location: 'North Parking Lot', streamUrl: `${AI_URL}/api/video_feed/2`, attributes: [], threat: null },
   { id: 3, code: 'CAM-03', location: 'Loading Dock Area', streamUrl: '', attributes: [], threat: null },
   { id: 4, code: 'CAM-04', location: 'Lobby Reception', streamUrl: '', attributes: [], threat: null },
   { id: 5, code: 'CAM-05', location: 'East Perimeter Corridor', streamUrl: '', attributes: [], threat: null },
@@ -69,14 +69,14 @@ export default function App() {
     const slotNum = Number(slotId)
     const updated = cameras.map((c) => {
       if (c.id === slotNum) {
-        let finalUrl = `http://127.0.0.1:8002/api/video_feed/${slotNum}`
+        let finalUrl = `${AI_URL}/api/video_feed/${slotNum}`
         if (streamUrl && streamUrl.trim()) {
           const urlStr = streamUrl.trim()
           // Browsers cannot play RTSP directly. Proxy it through our local AI server.
           if (urlStr.toLowerCase().startsWith('rtsp://')) {
-            finalUrl = `http://127.0.0.1:8002/api/video_feed/${slotNum}`
+            finalUrl = `${AI_URL}/api/video_feed/${slotNum}`
           } else if (urlStr === '0' || urlStr.toLowerCase() === 'webcam') {
-            finalUrl = `http://127.0.0.1:8002/api/video_feed/webcam`
+            finalUrl = `${AI_URL}/api/video_feed/webcam`
           } else {
             finalUrl = urlStr
           }

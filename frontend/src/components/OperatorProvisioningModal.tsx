@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, UserPlus, Key, Copy, Check, X, User, BadgeCheck, Eye, EyeOff, Lock, Edit3, Trash2, Power } from 'lucide-react';
+import { safeFetch, BACKEND_URL } from '../utils/api';
 
 export default function OperatorProvisioningModal({ onClose }) {
   const [name, setName] = useState('');
@@ -17,7 +18,7 @@ export default function OperatorProvisioningModal({ onClose }) {
   const [operatorsList, setOperatorsList] = useState([]);
 
   React.useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/operators')
+    safeFetch(`${BACKEND_URL}/api/operators`, {}, 2500)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -47,11 +48,11 @@ export default function OperatorProvisioningModal({ onClose }) {
       is_active: 1
     };
 
-    fetch('http://127.0.0.1:8000/api/operators', {
+    safeFetch(`${BACKEND_URL}/api/operators`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newOperator)
-    })
+    }, 2500)
       .then(res => res.json())
       .then(data => {
         if (data.badge_id) {
@@ -69,11 +70,11 @@ export default function OperatorProvisioningModal({ onClose }) {
   const handleSaveEditedPin = (idx) => {
     if (!newEditPinVal.trim() || newEditPinVal.trim().length < 4) return;
     const op = operatorsList[idx];
-    fetch(`http://127.0.0.1:8000/api/operators/${op.badge_id}`, {
+    safeFetch(`${BACKEND_URL}/api/operators/${op.badge_id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin: newEditPinVal.trim() })
-    })
+    }, 2500)
       .then(res => res.json())
       .then(data => {
         const updated = operatorsList.map((o, i) => i === idx ? data : o);
@@ -87,7 +88,7 @@ export default function OperatorProvisioningModal({ onClose }) {
   const handleDeleteOperator = (idx) => {
     if (window.confirm("Are you sure you want to permanently delete this operator?")) {
       const op = operatorsList[idx];
-      fetch(`http://127.0.0.1:8000/api/operators/${op.badge_id}`, { method: 'DELETE' })
+      safeFetch(`${BACKEND_URL}/api/operators/${op.badge_id}`, { method: 'DELETE' }, 2500)
         .then(() => {
           setOperatorsList(operatorsList.filter((_, i) => i !== idx));
         })
@@ -98,11 +99,11 @@ export default function OperatorProvisioningModal({ onClose }) {
   const handleToggleStatus = (idx) => {
     const op = operatorsList[idx];
     const newStatus = op.is_active === 0 ? 1 : 0;
-    fetch(`http://127.0.0.1:8000/api/operators/${op.badge_id}`, {
+    safeFetch(`${BACKEND_URL}/api/operators/${op.badge_id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: newStatus })
-    })
+    }, 2500)
       .then(res => res.json())
       .then(data => {
         const updated = operatorsList.map((o, i) => i === idx ? data : o);

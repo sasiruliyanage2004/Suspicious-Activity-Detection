@@ -16,6 +16,7 @@ import {
   Moon,
 } from 'lucide-react'
 import { speechSiren } from '../utils/speechSiren'
+import { safeFetch, BACKEND_URL } from '../utils/api'
 
 function ShieldEmblem() {
   return (
@@ -276,7 +277,7 @@ export default function Header({
                   onClick={() => {
                     setProfileOpen(false)
                     if (isOperator && activeUser?.badgeId) {
-                      fetch(`http://127.0.0.1:8000/api/operators/${activeUser.badgeId}/logout`, { method: 'POST' })
+                      safeFetch(`${BACKEND_URL}/api/operators/${activeUser.badgeId}/logout`, { method: 'POST' }, 2000)
                         .finally(() => onLogout?.())
                     } else {
                       onLogout?.()

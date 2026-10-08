@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Settings2, Building, Sliders, Send, ShieldCheck, Key, BrainCircuit, ToggleLeft, ToggleRight, Lock, Users, CheckCircle, AlertTriangle, ShieldAlert } from 'lucide-react'
 import DualControlModal from './DualControlModal'
+import { safeFetch, AI_URL } from '../utils/api'
 
 export default function NodeSettingsView({ sensitivity, onSensitivityChange }) {
   const [license, setLicense] = useState({
@@ -29,11 +30,11 @@ export default function NodeSettingsView({ sensitivity, onSensitivityChange }) {
   const handlePtzLimitChange = (e) => {
     const val = parseInt(e.target.value)
     setPtzLimit(val)
-    fetch('http://127.0.0.1:8002/api/settings/ptz_limit', {
+    safeFetch(`${AI_URL}/api/settings/ptz_limit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ limit: val })
-    }).catch(() => {})
+    }, 2000).catch(() => {})
   }
 
   useEffect(() => {
@@ -42,7 +43,7 @@ export default function NodeSettingsView({ sensitivity, onSensitivityChange }) {
       .then(data => setLicense(data))
       .catch(() => {})
 
-    fetch('http://127.0.0.1:8002/api/features')
+    safeFetch(`${AI_URL}/api/features`, {}, 2500)
       .then(res => res.json())
       .then(data => setFeatures(data))
       .catch(() => {})
@@ -51,11 +52,11 @@ export default function NodeSettingsView({ sensitivity, onSensitivityChange }) {
   const toggleFeature = (key) => {
     const newFeatures = { ...features, [key]: !features[key] }
     setFeatures(newFeatures)
-    fetch('http://127.0.0.1:8002/api/features', {
+    safeFetch(`${AI_URL}/api/features`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ settings: { [key]: !features[key] } })
-    }).catch(() => {})
+    }, 2000).catch(() => {})
   }
 
   return (

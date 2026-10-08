@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react'
 import { ScanLine, Plus, Save, Trash2, Camera, Lock, CheckCircle2, ShieldAlert, Layers, MousePointer, RefreshCw, AlertTriangle } from 'lucide-react'
+import { safeFetch, AI_URL } from '../utils/api'
 
 export default function IntrusionZonesView({ cameras = [] }) {
   const [selectedCam, setSelectedCam] = useState(cameras?.[0]?.id || 1)
@@ -46,7 +47,7 @@ export default function IntrusionZonesView({ cameras = [] }) {
     if (Array.isArray(zones) && zones.length > 0) {
       zones.forEach((z: any) => {
         if (z && z.coords) {
-          fetch('http://127.0.0.1:8002/api/zones', {
+          safeFetch(`${AI_URL}/api/zones`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -56,7 +57,7 @@ export default function IntrusionZonesView({ cameras = [] }) {
               coordinates: z.coords,
               alarm_level: z.type?.includes('Red') ? 'CRITICAL_TRIPWIRE' : 'WARNING_ZONE'
             })
-          }).catch(() => {})
+          }, 2000).catch(() => {})
         }
       })
     }
@@ -134,7 +135,7 @@ export default function IntrusionZonesView({ cameras = [] }) {
     flashToast(`🛡️ Active Zone "${finalName}" successfully armed & activated!`)
 
     // Notify backend AI detection engine of new perimeter coordinates
-    fetch('http://127.0.0.1:8002/api/zones', {
+    safeFetch(`${AI_URL}/api/zones`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -144,12 +145,12 @@ export default function IntrusionZonesView({ cameras = [] }) {
         coordinates: newZone.coords,
         alarm_level: alarmType
       })
-    }).catch(() => {})
+    }, 2000).catch(() => {})
   }
 
   const handleDeleteZone = (id: any) => {
     setZones((prev: any) => prev.filter((z: any) => z.id !== id))
-    fetch(`http://127.0.0.1:8002/api/zones/${id}`, { method: 'DELETE' }).catch(() => {})
+    safeFetch(`${AI_URL}/api/zones/${id}`, { method: 'DELETE' }, 2000).catch(() => {})
     flashToast('🗑️ Zone removed')
   }
 

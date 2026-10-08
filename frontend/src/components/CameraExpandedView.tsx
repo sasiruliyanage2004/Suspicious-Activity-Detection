@@ -21,8 +21,8 @@ import {
   Cpu,
   FlipHorizontal
 } from 'lucide-react'
-import ZoneDrawer from './ZoneDrawer'
 import AiVisionFeed from './AiVisionFeed'
+import { safeFetch, BACKEND_URL, AI_URL } from '../utils/api'
 
 interface CameraExpandedViewProps {
   camera: {
@@ -59,28 +59,28 @@ export default function CameraExpandedView({ camera, index = 0, onClose }: Camer
   // ── PTZ Command Handler ──────────────────────────────────────────────────
   const handlePtz = (direction: string, label: string) => {
     flashToast(`PTZ: ${label}`)
-    fetch(`http://127.0.0.1:8002/api/cameras/${camera.code}/ptz_control`, {
+    safeFetch(`${AI_URL}/api/cameras/${camera.code}/ptz_control`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ direction })
-    }).catch(() => {})
+    }, 2000).catch(() => {})
   }
 
   // ── Set Home Position ────────────────────────────────────────────────────
   const handleSetHome = () => {
     flashToast('📍 Home Camera Angle Saved')
-    fetch(`http://127.0.0.1:8002/api/cameras/${camera.code}/ptz_set_home`, {
+    safeFetch(`${AI_URL}/api/cameras/${camera.code}/ptz_set_home`, {
       method: 'POST'
-    }).catch(() => {})
+    }, 2000).catch(() => {})
   }
 
   // ── AI Framing Optimization Routine ──────────────────────────────────────
   const runOptimize = () => {
     setOptimizing(true)
     flashToast('✨ AI Analyzing Scene Geometry…')
-    fetch(`http://127.0.0.1:8002/api/cameras/${camera.code}/optimize_view`, {
+    safeFetch(`${AI_URL}/api/cameras/${camera.code}/optimize_view`, {
       method: 'POST'
-    }).catch(() => {})
+    }, 2000).catch(() => {})
 
     setTimeout(() => {
       setOptimizing(false)
@@ -93,11 +93,11 @@ export default function CameraExpandedView({ camera, index = 0, onClose }: Camer
     setDrawingZone(false)
     flashToast(`🛡️ Intrusion Boundary Saved (${points.length} Points)`)
     const formattedPoints = points.map((p) => [Math.round(p.x), Math.round(p.y)])
-    fetch(`http://127.0.0.1:8000/api/cameras/${camera.code}/zone`, {
+    safeFetch(`${BACKEND_URL}/api/cameras/${camera.code}/zone`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ points: formattedPoints })
-    }).catch(() => {})
+    }, 2000).catch(() => {})
   }
 
   if (!camera) return null
@@ -168,7 +168,7 @@ export default function CameraExpandedView({ camera, index = 0, onClose }: Camer
             {/* Mirror / Flip Camera Toggle */}
             <button
               onClick={() => {
-                fetch(`http://127.0.0.1:8002/api/cameras/${camera.code}/toggle_mirror`, { method: 'POST' })
+                safeFetch(`${AI_URL}/api/cameras/${camera.code}/toggle_mirror`, { method: 'POST' }, 2000)
                   .then((res) => res.json())
                   .then((data) => {
                     flashToast(data.is_mirrored ? '🪞 Camera Mirror Mode: ON' : '📷 Camera Normal Mode: ON')

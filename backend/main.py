@@ -265,6 +265,26 @@ def capture_live_face(camera_id: str):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@app.get("/api/vault/files")
+def list_vault_files():
+    """Lists authentic recorded clips stored in recordings_vault with size and metadata."""
+    files = []
+    if os.path.exists(vault_dir):
+        for f in os.listdir(vault_dir):
+            if f.endswith(".mp4") or f.endswith(".webm") or f.endswith(".avi"):
+                p = os.path.join(vault_dir, f)
+                try:
+                    stat = os.stat(p)
+                    size_mb = round(stat.st_size / (1024 * 1024), 2)
+                    files.append({
+                        "filename": f,
+                        "sizeMB": size_mb,
+                        "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                    })
+                except Exception:
+                    pass
+    return sorted(files, key=lambda x: x.get("created_at", ""), reverse=True)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)

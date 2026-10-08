@@ -1,18 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { safeFetch, BACKEND_URL } from '../../utils/api';
 
-export default function ZoneDrawer({ cameraId, onClose }) {
-  const [points, setPoints] = useState([]);
+export default function ZoneDrawer({ cameraId, onClose }: { cameraId: any; onClose: () => void }) {
+  const [points, setPoints] = useState<any[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Fetch existing zone if any
   useEffect(() => {
-    fetch(`http://127.0.0.1:8000/api/cameras/${cameraId}/zone`)
+    safeFetch(`${BACKEND_URL}/api/cameras/${cameraId}/zone`, {}, 2500)
       .then(res => res.json())
       .then(data => {
         if (data.points && data.points.length > 0) {
-          // Convert 1280x720 back to percentages (0-1) for rendering if we want,
-          // but for simplicity, let's just let the user redraw.
+          // Zone points loaded
         }
       })
       .catch(console.error);
@@ -45,11 +45,11 @@ export default function ZoneDrawer({ cameraId, onClose }) {
     ]);
 
     try {
-        await fetch(`http://127.0.0.1:8000/api/cameras/${cameraId}/zone`, {
+        await safeFetch(`${BACKEND_URL}/api/cameras/${cameraId}/zone`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ points: backendPoints })
-        });
+        }, 2500);
         setIsDrawing(false);
         setPoints([]);
         onClose(); // Hide the drawer UI, backend stream will now show the red box!
@@ -61,11 +61,11 @@ export default function ZoneDrawer({ cameraId, onClose }) {
   const handleClear = async () => {
     setPoints([]);
     try {
-        await fetch(`http://127.0.0.1:8000/api/cameras/${cameraId}/zone`, {
+        await safeFetch(`${BACKEND_URL}/api/cameras/${cameraId}/zone`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ points: [] }) // Empty clears it
-        });
+        }, 2500);
     } catch (err) {}
   };
 

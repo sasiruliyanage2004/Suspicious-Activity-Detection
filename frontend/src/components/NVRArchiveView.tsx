@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { HardDrive, Video, Calendar, Clock, Download, Scissors, Play, Pause, CheckCircle2, Radio, ShieldCheck, AlertTriangle, Database, RefreshCw, FileText, Maximize2, Ban } from 'lucide-react'
+import { safeFetch, BACKEND_URL, AI_URL } from '../utils/api'
 
 export default function NVRArchiveView({ cameras = [] }) {
   const [selectedCamId, setSelectedCamId] = useState(1)
@@ -16,21 +17,18 @@ export default function NVRArchiveView({ cameras = [] }) {
       id: 1,
       code: 'CAM-01',
       location: 'Main Entrance Gate (PTZ-1)',
-      streamUrl: 'http://127.0.0.1:8002/api/video_feed/1'
+      streamUrl: `${AI_URL}/api/video_feed/1`
     }
   }, [cameras, selectedCamId])
 
-
-
   // Fetch actual existing files from backend (Zero Fake / Mock Data)
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/vault/files')
+    safeFetch(`${BACKEND_URL}/api/vault/files`, {}, 2500)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setRealVaultFiles(data)
       })
-      .catch(() => {
-      })
+      .catch(() => {})
   }, [selectedDate, selectedCamId])
 
   const hourlySegments = useMemo(() => {

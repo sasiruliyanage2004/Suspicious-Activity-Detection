@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { ShieldAlert, Search, Filter, AlertTriangle, CheckCircle, Clock, Camera, Download, RefreshCw, Video, Play, Maximize2, X, Calendar, MapPin, Radio, Film, ExternalLink, FileText } from 'lucide-react'
 import { speechSiren } from '../utils/speechSiren'
-import { safeFetch, BACKEND_URL, getWsUrl } from '../utils/api'
+import { safeFetch, BACKEND_URL, AI_URL, getWsUrl } from '../utils/api'
 
 export default function ThreatAlertsView({ cameras = [] }) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -154,8 +154,8 @@ export default function ThreatAlertsView({ cameras = [] }) {
       return matchesSearch && matchesLevel && matchesCamera && matchesDate
     })
 
-  const getStreamUrl = (threat) => {
-    return `http://127.0.0.1:8002/api/video_feed/${threat.camNumericId || 1}`
+  const getStreamUrl = (threat: any) => {
+    return `${AI_URL}/api/video_feed/${threat.camNumericId || 1}`
   }
 
   const takeSnapshot = (threat) => {

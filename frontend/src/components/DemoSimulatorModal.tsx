@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Zap, ShieldAlert, AlertTriangle, UserX, Crosshair, Package, Play, CheckCircle2, X, Send, Volume2 } from 'lucide-react'
 import { speechSiren } from '../utils/speechSiren'
+import { safeFetch, BACKEND_URL, AI_URL } from '../utils/api'
 
 const THREAT_PRESETS = [
   {
@@ -78,15 +79,15 @@ export default function DemoSimulatorModal({ onClose, cameras = [] }) {
         details: `[EXECUTIVE DEMO] ${preset.desc}`
       }
 
-      let res = await fetch('http://127.0.0.1:8002/api/simulate/threat', {
+      let res = await safeFetch(`${AI_URL}/api/simulate/threat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
-      })
+      }, 2500).catch(() => null)
 
       // Fallback directly to Port 8000 backend alerts if pipeline port is resetting
-      if (!res.ok) {
-        res = await fetch('http://127.0.0.1:8000/alerts/', {
+      if (!res || !res.ok) {
+        res = await safeFetch(`${BACKEND_URL}/alerts/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -95,7 +96,7 @@ export default function DemoSimulatorModal({ onClose, cameras = [] }) {
             confidence: preset.confidence,
             details: `[EXECUTIVE DEMO] ${preset.desc}`
           })
-        })
+        }, 2500).catch(() => null)
       }
 
       if (res.ok) {

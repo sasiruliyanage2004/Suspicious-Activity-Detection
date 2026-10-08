@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Camera, LayoutGrid, Maximize2, Minimize2, Video, Activity, ShieldCheck, AlertTriangle, RefreshCw, ZoomIn, ZoomOut, Move, Download, Sliders, ExternalLink, Radio } from 'lucide-react'
+import { AI_URL } from '../utils/api'
 
 interface CameraNodesViewProps {
   cameras?: any[];
@@ -50,10 +51,10 @@ export default function CameraNodesView({ cameras = [], onExpandCamera, onProvis
     }, 1500)
   }
 
-  const getFeedUrl = (cam) => {
+  const getFeedUrl = (cam: any) => {
     if (!cam) return null
     if (cam.streamUrl) return cam.streamUrl
-    return `http://127.0.0.1:8002/api/video_feed/${cam.id}`
+    return `${AI_URL}/api/video_feed/${cam.id}`
   }
 
   return (

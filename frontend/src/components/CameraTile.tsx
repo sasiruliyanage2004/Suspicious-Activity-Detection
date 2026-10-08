@@ -1,6 +1,7 @@
 import React, { useState, memo } from 'react'
 import { Pencil, Check, TriangleAlert, Video, Radio, Activity, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Crosshair, FlipHorizontal } from 'lucide-react'
 import { playBleep } from '../utils/sounds'
+import { safeFetch, AI_URL } from '../utils/api'
 import AiVisionFeed from './AiVisionFeed'
 
 function FeedBackdrop({ seed = 0, cameraCode, location }) {
@@ -78,19 +79,19 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
     e.stopPropagation()
     playBleep()
     if (!camera?.code) return
-    fetch(`http://127.0.0.1:8002/api/cameras/${camera.code}/ptz_control`, {
+    safeFetch(`${AI_URL}/api/cameras/${camera.code}/ptz_control`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ direction })
-    }).catch(() => {})
+    }, 2000).catch(() => {})
   }
 
   const handlePTZHome = (e) => {
     e.stopPropagation()
     if (!camera?.code) return
-    fetch(`http://127.0.0.1:8002/api/cameras/${camera.code}/ptz_home`, {
+    safeFetch(`${AI_URL}/api/cameras/${camera.code}/ptz_home`, {
       method: 'POST'
-    }).catch(() => {})
+    }, 2000).catch(() => {})
   }
 
   const commitRename = () => {
@@ -185,7 +186,7 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
           onClick={(e) => {
             e.stopPropagation()
             playBleep()
-            fetch(`http://127.0.0.1:8002/api/cameras/${camera.code}/toggle_mirror`, { method: 'POST' }).catch(() => {})
+            safeFetch(`${AI_URL}/api/cameras/${camera.code}/toggle_mirror`, { method: 'POST' }, 2000).catch(() => {})
           }}
           title="Click to Flip / Mirror Camera Feed Horizontally"
           className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-black/60 text-gray-300 border border-white/10 hover:bg-cyan-500/20 hover:text-cyan-300 hover:border-cyan-400 transition-all shadow-md"
