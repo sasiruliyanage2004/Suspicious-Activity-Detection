@@ -1,7 +1,13 @@
 import React, { useState, useMemo } from 'react'
 import { Camera, LayoutGrid, Maximize2, Minimize2, Video, Activity, ShieldCheck, AlertTriangle, RefreshCw, ZoomIn, ZoomOut, Move, Download, Sliders, ExternalLink, Radio } from 'lucide-react'
 
-export default function CameraNodesView({ cameras = [], onExpandCamera }) {
+interface CameraNodesViewProps {
+  cameras?: any[];
+  onExpandCamera?: (cam: any) => void;
+  onProvision?: (slotId: any, streamUrl: any, customName: any) => void;
+}
+
+export default function CameraNodesView({ cameras = [], onExpandCamera, onProvision: _onProvision }: CameraNodesViewProps) {
   const [layoutMode, setLayoutMode] = useState('nine') // 'single', 'quad', 'nine', 'cinema'
   const [selectedCamId, setSelectedCamId] = useState(1)
   const [ptzState, setPtzState] = useState({ zoom: 1, pan: 0, tilt: 0 })

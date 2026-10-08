@@ -5,7 +5,15 @@ import CameraGrid from './CameraGrid'
 import ActivityLog from './ActivityLog'
 import { safeFetch, AI_URL } from '../utils/api'
 
-export default function Dashboard({ cameras, onExpandCamera, onRename, onProvision, onRemove }) {
+interface DashboardProps {
+  cameras: any[];
+  onExpandCamera: (cam: any) => void;
+  onRename?: (id: any, name: string) => void;
+  onProvision?: (slotId: any, streamUrl: any, customName: any) => void;
+  onRemove?: (id: any) => void;
+}
+
+export default function Dashboard({ cameras, onExpandCamera, onRename, onProvision, onRemove }: DashboardProps) {
   const [showDiscoveryModal, setShowDiscoveryModal] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
   const [discoveredList, setDiscoveredList] = useState([])

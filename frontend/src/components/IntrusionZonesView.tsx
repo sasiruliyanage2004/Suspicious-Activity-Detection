@@ -217,7 +217,7 @@ export default function IntrusionZonesView({ cameras = [] }) {
                 alt={camObj.code}
                 className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                 onError={(e) => {
-                  const target = e.target;
+                  const target = e.currentTarget as HTMLImageElement;
                   setTimeout(() => {
                     if (target && camObj?.streamUrl) target.src = `${camObj.streamUrl}?t=${Date.now()}`;
                   }, 1500);

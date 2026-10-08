@@ -246,7 +246,7 @@ export default function NVRArchiveView({ cameras = [] }) {
                   alt={activeCamera.code}
                   className="w-full h-full object-contain transform-gpu"
                   onError={(e) => {
-                    const target = e.target;
+                    const target = e.currentTarget as HTMLImageElement;
                     setTimeout(() => {
                       if (target && activeCamera?.streamUrl) target.src = `${activeCamera.streamUrl}?t=${Date.now()}`;
                     }, 1500);

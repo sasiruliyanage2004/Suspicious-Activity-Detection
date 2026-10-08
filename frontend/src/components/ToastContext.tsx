@@ -12,10 +12,10 @@ export function ToastProvider({ children }) {
     const id = Date.now().toString()
     setToasts(prev => [...prev, { id, type, title, message }])
 
-    // Play sound based on type
     try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext
-      const ctx = new AudioContext()
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+      if (AudioContextClass) {
+        const ctx = new AudioContextClass()
       const osc = ctx.createOscillator()
       const gainNode = ctx.createGain()
       
@@ -39,7 +39,8 @@ export function ToastProvider({ children }) {
         osc.start()
         osc.stop(ctx.currentTime + 0.2)
       }
-    } catch (e) {
+    }
+  } catch (e) {
       // Audio might be blocked by browser policy until interaction
     }
 

@@ -27,6 +27,7 @@ export default function TVWallMode({ cameras, onExit, onRename }) {
             index={i}
             onExpand={setExpanded}
             onRename={onRename}
+            onRemove={() => {}}
           />
         ))}
       </div>

@@ -44,15 +44,16 @@ export default function AnalyticsView({ cameras = [] }) {
 
   // Dynamically calculate realistic metrics based on real database alerts
   const analyticsData = useMemo(() => {
-    let now = new Date();
+    const nowMs = Date.now();
     let filteredAlerts = alerts.filter(a => {
       if(selectedNode !== 'ALL' && a.camera_id !== selectedNode) return false;
       if(selectedCategory !== 'ALL' && !a.behavior_type.toUpperCase().includes(selectedCategory)) return false;
-      let alertTime = new Date(a.timestamp);
-      if(dateRange === '24H') return (now - alertTime) <= 24 * 60 * 60 * 1000;
-      if(dateRange === 'YESTERDAY') return (now - alertTime) > 24 * 60 * 60 * 1000 && (now - alertTime) <= 48 * 60 * 60 * 1000;
-      if(dateRange === '7D') return (now - alertTime) <= 7 * 24 * 60 * 60 * 1000;
-      if(dateRange === '30D') return (now - alertTime) <= 30 * 24 * 60 * 60 * 1000;
+      const alertTimeMs = new Date(a.timestamp).getTime();
+      const diff = nowMs - alertTimeMs;
+      if(dateRange === '24H') return diff <= 24 * 60 * 60 * 1000;
+      if(dateRange === 'YESTERDAY') return diff > 24 * 60 * 60 * 1000 && diff <= 48 * 60 * 60 * 1000;
+      if(dateRange === '7D') return diff <= 7 * 24 * 60 * 60 * 1000;
+      if(dateRange === '30D') return diff <= 30 * 24 * 60 * 60 * 1000;
       return true;
     });
 

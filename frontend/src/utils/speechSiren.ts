@@ -4,9 +4,16 @@
  */
 
 // Global array to prevent Chrome from garbage collecting utterances before onend fires
-window.activeSpeechUtterances = [];
+if (typeof window !== 'undefined') {
+  window.activeSpeechUtterances = [];
+}
 
 class SpeechSirenManager {
+  audioCtx: AudioContext | null;
+  speechSynthesis: SpeechSynthesis | null;
+  muted: boolean;
+  lockdownActive: boolean;
+
   constructor() {
     this.audioCtx = null;
     this.speechSynthesis = typeof window !== 'undefined' ? window.speechSynthesis : null;
@@ -14,14 +21,14 @@ class SpeechSirenManager {
     this.lockdownActive = false;
   }
 
-  setMuted(muteStatus) {
+  setMuted(muteStatus: boolean) {
     this.muted = muteStatus;
     if (this.speechSynthesis && muteStatus) {
       this.speechSynthesis.cancel();
     }
   }
 
-  playTacticalBeep(frequency = 880, duration = 0.15, type = 'sawtooth') {
+  playTacticalBeep(frequency = 880, duration = 0.15, type: OscillatorType = 'sawtooth') {
     if (this.muted || typeof window === 'undefined') return;
     try {
       if (!this.audioCtx) {
@@ -60,7 +67,7 @@ class SpeechSirenManager {
     audio.play().catch(e => console.warn("Audio bypassed:", e));
   }
 
-  speakAlarm(behaviorType, cameraId = "CAM-01") {
+  speakAlarm(behaviorType: string, _cameraId = "CAM-01") {
     if (this.muted || !this.speechSynthesis) return;
     try {
       if (this.speechSynthesis.speaking) {
@@ -99,19 +106,23 @@ class SpeechSirenManager {
       utteranceEng.pitch = 0.95;
       utteranceEng.volume = 1.0;
 
-      window.activeSpeechUtterances.push(utteranceEng);
+      if (window.activeSpeechUtterances) {
+        window.activeSpeechUtterances.push(utteranceEng);
+      }
 
       utteranceEng.onend = () => {
-        // Play the custom YouTube sound AT THE END of the speech for high priority threats
+        // Play the custom sound AT THE END of the speech for high priority threats
         if (isHighPriority && !this.muted && typeof window !== 'undefined') {
           this.playLockdownSiren();
         }
         // Cleanup memory
-        window.activeSpeechUtterances = window.activeSpeechUtterances.filter(u => u !== utteranceEng);
+        if (window.activeSpeechUtterances) {
+          window.activeSpeechUtterances = window.activeSpeechUtterances.filter(u => u !== utteranceEng);
+        }
       };
 
       setTimeout(() => {
-        if (!this.muted) {
+        if (!this.muted && this.speechSynthesis) {
           this.speechSynthesis.speak(utteranceEng);
         }
       }, speechDelay);
@@ -129,18 +140,22 @@ class SpeechSirenManager {
       const utteranceEng = new SpeechSynthesisUtterance(engText);
       utteranceEng.rate = 1.1;
 
-      window.activeSpeechUtterances.push(utteranceEng);
+      if (window.activeSpeechUtterances) {
+        window.activeSpeechUtterances.push(utteranceEng);
+      }
 
       utteranceEng.onend = () => {
-        // Play the YouTube sound AT THE END of the lockdown speech
+        // Play the sound AT THE END of the lockdown speech
         if (!this.muted) {
           this.playLockdownSiren();
         }
-        window.activeSpeechUtterances = window.activeSpeechUtterances.filter(u => u !== utteranceEng);
+        if (window.activeSpeechUtterances) {
+          window.activeSpeechUtterances = window.activeSpeechUtterances.filter(u => u !== utteranceEng);
+        }
       };
 
       setTimeout(() => {
-        if (!this.muted) {
+        if (!this.muted && this.speechSynthesis) {
           this.speechSynthesis.speak(utteranceEng);
         }
       }, 100);
@@ -150,7 +165,7 @@ class SpeechSirenManager {
   }
 }
 
-function strReplaceAll(str, find, replace) {
+function strReplaceAll(str: string, find: string, replace: string) {
   return str.split(find).join(replace);
 }
 

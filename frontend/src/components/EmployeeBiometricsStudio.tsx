@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { UserCheck, UserPlus, Shield, Key, Camera, Upload, Trash2, CheckCircle, AlertTriangle, Cpu, Sparkles, Building, Lock, RefreshCw, Eye, Search, User, Scan } from 'lucide-react'
 
-export default function EmployeeBiometricsStudio() {
+interface EmployeeBiometricsStudioProps {
+  cameras?: any[];
+  onEnrolled?: () => void;
+}
+
+export default function EmployeeBiometricsStudio({ cameras: _cameras, onEnrolled: _onEnrolled }: EmployeeBiometricsStudioProps = {}) {
   // Absolutely zero mock or fabricated data
   const [employees, setEmployees] = useState(() => {
     const saved = localStorage.getItem('aethra_real_employees')

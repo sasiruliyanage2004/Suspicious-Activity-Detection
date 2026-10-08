@@ -2,14 +2,27 @@ import React, { useState, useEffect, useRef } from 'react'
 import { ShieldCheck, UserCheck, RefreshCw, Activity, Search } from 'lucide-react'
 import { safeFetch, BACKEND_URL } from '../utils/api'
 
-const FALLBACK_OPERATORS = [
-  { badge_id: 'SEC-OP-1024-A', name: 'Nimal Silva', role: 'operator', is_online: 1, last_active: new Date().toISOString() },
-  { badge_id: 'SEC-OP-9842-B', name: 'Sunethra Perera', role: 'operator', is_online: 0, last_active: new Date(Date.now() - 3600000).toISOString() },
-  { badge_id: 'CISO-EXEC-01', name: 'Master CISO Commander', role: 'admin', is_online: 1, last_active: new Date().toISOString() }
+interface Operator {
+  badge_id: string;
+  name: string;
+  role: string;
+  is_online: number;
+  last_active?: string;
+  last_login?: string;
+  last_active_ping?: string;
+  is_active?: number;
+  shift?: string;
+  activity_score?: number;
+}
+
+const FALLBACK_OPERATORS: Operator[] = [
+  { badge_id: 'SEC-OP-1024-A', name: 'Nimal Silva', role: 'operator', is_online: 1, last_active: new Date().toISOString(), last_login: new Date().toISOString(), shift: 'ALPHA (0600 - 1400)', activity_score: 95 },
+  { badge_id: 'SEC-OP-9842-B', name: 'Sunethra Perera', role: 'operator', is_online: 0, last_active: new Date(Date.now() - 3600000).toISOString(), last_login: new Date(Date.now() - 3600000).toISOString(), shift: 'BRAVO (1400 - 2200)', activity_score: 82 },
+  { badge_id: 'CISO-EXEC-01', name: 'Master CISO Commander', role: 'admin', is_online: 1, last_active: new Date().toISOString(), last_login: new Date().toISOString(), shift: 'COMMAND', activity_score: 99 }
 ]
 
 export default function OperatorAuditView() {
-  const [operators, setOperators] = useState(FALLBACK_OPERATORS)
+  const [operators, setOperators] = useState<Operator[]>(FALLBACK_OPERATORS)
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const isOnlineRef = useRef(true)

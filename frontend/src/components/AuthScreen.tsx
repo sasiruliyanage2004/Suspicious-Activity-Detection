@@ -64,22 +64,24 @@ function ShieldMark({ size = 60 }) {
 }
 
 // ─── Input Field Shell ──────────────────────────────────────────────────────
-function Field({ icon: Icon, children, amber }) {
+function Field({ icon: Icon, children, amber }: { icon: any; children: any; amber?: boolean }) {
   return (
     <div className={`group relative flex items-center gap-3 rounded-xl bg-white/[0.03] ring-1 transition-all px-4 h-11 ${
       amber
         ? 'ring-[#FF8A00]/20 focus-within:ring-[#FF8A00]/60 focus-within:bg-[#FF8A00]/5'
         : 'ring-white/[0.07] focus-within:ring-cyan-glow/60 focus-within:bg-white/[0.05]'
     }`}>
-      <Icon size={15} className={`shrink-0 transition-colors ${
-        amber ? 'text-[#FF8A00]/50 group-focus-within:text-[#FF8A00]' : 'text-white/30 group-focus-within:text-cyan-glow'
-      }`} />
+      {Icon && (
+        <Icon size={15} className={`shrink-0 transition-colors ${
+          amber ? 'text-[#FF8A00]/50 group-focus-within:text-[#FF8A00]' : 'text-white/30 group-focus-within:text-cyan-glow'
+        }`} />
+      )}
       {children}
     </div>
   )
 }
 
-function Label({ children, amber }) {
+function Label({ children, amber }: { children: any; amber?: boolean }) {
   return (
     <label className={`font-mono text-[9px] uppercase tracking-widest pl-1 ${
       amber ? 'text-[#FF8A00]/70' : 'text-cyan-glow/70'

@@ -4,8 +4,11 @@ import App from './App'
 import './index.css'
 import { ToastProvider } from './components/ToastContext'
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <ToastProvider>
-    <App />
-  </ToastProvider>
-)
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <ToastProvider>
+      <App />
+    </ToastProvider>
+  );
+}

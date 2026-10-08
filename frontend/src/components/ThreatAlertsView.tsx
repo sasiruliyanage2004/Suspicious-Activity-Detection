@@ -26,8 +26,8 @@ export default function ThreatAlertsView({ cameras = [] }) {
             const rawTime = item.timestamp || '';
             const isUTC = rawTime.includes('Z') || rawTime.includes('+');
             const dateObj = new Date(isUTC ? rawTime : (rawTime ? rawTime + 'Z' : Date.now()));
-            const pad = (n) => n.toString().padStart(2, '0');
-            const formattedTime = !isNaN(dateObj) 
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            const formattedTime = !isNaN(dateObj.getTime()) 
               ? `${dateObj.getFullYear()}-${pad(dateObj.getMonth()+1)}-${pad(dateObj.getDate())} ${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}:${pad(dateObj.getSeconds())}`
               : item.timestamp;
             return {
@@ -88,7 +88,7 @@ export default function ThreatAlertsView({ cameras = [] }) {
     }
   }, [])
 
-  const handleAcknowledge = (id, e) => {
+  const handleAcknowledge = (id: any, e?: any) => {
     if (e) e.stopPropagation()
     setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'ACKNOWLEDGED', level: 'RESOLVED' } : a)))
     if (selectedThreat && selectedThreat.id === id) {
@@ -454,8 +454,10 @@ export default function ThreatAlertsView({ cameras = [] }) {
                   alt={selectedThreat.camera}
                   className="w-full h-full object-contain max-h-[520px]"
                   onError={(e) => {
-                    e.target.style.display = 'none'
-                    if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
+                    const target = e.currentTarget as HTMLImageElement
+                    target.style.display = 'none'
+                    const sibling = target.nextElementSibling as HTMLElement | null
+                    if (sibling) sibling.style.display = 'flex'
                   }}
                 />
               )}

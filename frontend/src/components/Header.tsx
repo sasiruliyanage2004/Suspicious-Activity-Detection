@@ -39,6 +39,18 @@ function ShieldEmblem() {
   )
 }
 
+interface HeaderProps {
+  sensitivity: number;
+  onSensitivityChange: (val: any) => void;
+  muted: boolean;
+  onToggleMute: () => void;
+  onEnterTvWall: () => void;
+  onOpenOperatorModal?: () => void;
+  onOpenSimulatorModal?: () => void;
+  activeUser: any;
+  onLogout: () => void;
+}
+
 export default function Header({
   sensitivity,
   onSensitivityChange,
@@ -49,7 +61,7 @@ export default function Header({
   onOpenSimulatorModal,
   activeUser,
   onLogout
-}) {
+}: HeaderProps) {
   const [profileOpen, setProfileOpen] = useState(false)
   const [gatesLocked, setGatesLocked] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
