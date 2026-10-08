@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react'
+import React, { useState, useEffect, memo } from 'react'
 import { Pencil, Check, TriangleAlert, Video, Radio, Activity, Trash2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Crosshair, FlipHorizontal } from 'lucide-react'
 import { playBleep } from '../utils/sounds'
 import { safeFetch, AI_URL } from '../utils/api'
@@ -101,10 +101,25 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
 
   const [timestamp, setTimestamp] = useState('')
 
-  // ── Auto Fallback to High-Tech AI Computer Vision Simulation on Stream Offline ──
+  // ── Auto Fallback to Professional CCTV Standby Slate on Stream Offline ──
   const handleStreamError = () => {
     setStreamFailed(true)
   }
+
+  const handleRetry = () => {
+    setStreamFailed(false)
+    setTimestamp(`?t=${Date.now()}`)
+  }
+
+  // Periodic automatic reconnection probe every 15s when offline
+  useEffect(() => {
+    if (!streamFailed) return
+    const timer = setInterval(() => {
+      setStreamFailed(false)
+      setTimestamp(`?t=${Date.now()}`)
+    }, 15000)
+    return () => clearInterval(timer)
+  }, [streamFailed])
 
   const cycleFilter = (e) => {
     e.stopPropagation()
@@ -146,6 +161,7 @@ function CameraTileComponent({ camera, index, personCount = 0, onExpand, onRenam
           seed={index} 
           filterMode={filterMode} 
           threat={camera.threat} 
+          onRetry={handleRetry}
         />
       )}
 

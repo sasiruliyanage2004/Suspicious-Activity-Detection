@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   X,
   ChevronUp,
@@ -51,11 +51,27 @@ export default function CameraExpandedView({ camera, index = 0, onClose }: Camer
   }
 
   const [streamFailed, setStreamFailed] = useState(false)
+  const [streamTimestamp, setStreamTimestamp] = useState('')
 
-  // ── Auto Fallback to High-Tech AI Computer Vision Simulation on Stream Offline ──
+  // ── Auto Fallback to Professional CCTV Standby Slate on Stream Offline ──
   const handleStreamError = () => {
     setStreamFailed(true)
   }
+
+  const handleRetry = () => {
+    setStreamFailed(false)
+    setStreamTimestamp(`?t=${Date.now()}`)
+    flashToast('🔄 Reconnecting to Live Feed…')
+  }
+
+  useEffect(() => {
+    if (!streamFailed) return
+    const timer = setInterval(() => {
+      setStreamFailed(false)
+      setStreamTimestamp(`?t=${Date.now()}`)
+    }, 15000)
+    return () => clearInterval(timer)
+  }, [streamFailed])
 
   // ── PTZ Command Handler ──────────────────────────────────────────────────
   const handlePtz = (direction: string, label: string) => {
@@ -118,13 +134,19 @@ export default function CameraExpandedView({ camera, index = 0, onClose }: Camer
       >
         {!streamFailed && camera.streamUrl ? (
           <img
-            src={camera.streamUrl}
+            src={`${camera.streamUrl}${streamTimestamp}`}
             alt={camera.location}
             className="absolute inset-0 w-full h-full object-cover transform-gpu"
             onError={handleStreamError}
           />
         ) : (
-          <AiVisionFeed camera={camera} seed={index} isExpanded={true} threat={camera.threat} />
+          <AiVisionFeed 
+            camera={camera} 
+            seed={index} 
+            isExpanded={true} 
+            threat={camera.threat} 
+            onRetry={handleRetry} 
+          />
         )}
 
         {/* Interactive Zone Boundary Drawer Overlay */}
