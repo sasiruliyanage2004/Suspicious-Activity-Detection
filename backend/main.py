@@ -78,11 +78,22 @@ os.makedirs(vault_dir, exist_ok=True)
 app = FastAPI(title=settings.PROJECT_NAME)
 app.mount("/vault", StaticFiles(directory=vault_dir), name="vault")
 
+ALLOWED_ORIGINS = [
+    "http://localhost:5050",
+    "http://127.0.0.1:5050",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://aethra-vision.vercel.app"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:[0-9]+)?",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

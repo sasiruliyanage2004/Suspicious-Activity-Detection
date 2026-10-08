@@ -60,11 +60,47 @@ def auto_register_camera():
 
 threading.Thread(target=auto_register_camera, daemon=True).start()
 
+SECURITY_BLACKLIST_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend", "security_data", "blocked_ips.json")
+
+@app.middleware("http")
+async def ai_security_shield_middleware(request, call_next):
+    client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (request.client.host if request.client else "127.0.0.1")
+    
+    if os.path.exists(SECURITY_BLACKLIST_PATH):
+        try:
+            with open(SECURITY_BLACKLIST_PATH, "r", encoding="utf-8") as f:
+                b_ips = json.load(f)
+                if client_ip in b_ips:
+                    from fastapi.responses import JSONResponse
+                    return JSONResponse(
+                        status_code=403,
+                        content={"status": "BLOCKED", "error": "Access Denied: IP Quarantined by Aethra Defense", "ip": client_ip}
+                    )
+        except Exception:
+            pass
+
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Cyber-Defense"] = "Aethra-Vision-IPS-Active"
+    return response
+
+ALLOWED_ORIGINS = [
+    "http://localhost:5050",
+    "http://127.0.0.1:5050",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://aethra-vision.vercel.app"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:[0-9]+)?",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

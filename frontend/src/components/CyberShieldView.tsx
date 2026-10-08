@@ -22,12 +22,15 @@ interface CyberEvent {
   id: string
   ip: string
   threat_type: string
+  mitre_id?: string
+  network_zone?: string
   severity: string
   details: string
   path: string
   method: string
   timestamp: string
   blocked: boolean
+  sha256_fingerprint?: string
 }
 
 interface BlockedIP {
@@ -317,16 +320,28 @@ export default function CyberShieldView() {
                     const isAlreadyBlocked = blockedIPs.some(b => b.ip === ev.ip)
                     return (
                       <tr key={ev.id} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="py-3 pl-2 font-bold text-red-400 whitespace-nowrap">
-                          <span className="flex items-center gap-1.5">
-                            <Globe size={13} className="text-red-400/60" />
-                            {ev.ip}
-                          </span>
+                        <td className="py-3 pl-2 whitespace-nowrap">
+                          <div className="flex flex-col">
+                            <span className="flex items-center gap-1.5 font-bold text-red-400">
+                              <Globe size={13} className="text-red-400/60" />
+                              {ev.ip}
+                            </span>
+                            <span className="text-[9.5px] text-gray-500 font-mono">
+                              {ev.network_zone || 'Internal LAN Node'}
+                            </span>
+                          </div>
                         </td>
                         <td className="py-3 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/5 border border-white/10 text-gray-300">
-                            {ev.threat_type}
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/5 border border-white/10 text-gray-300 w-fit">
+                              {ev.threat_type}
+                            </span>
+                            {ev.mitre_id && (
+                              <span className="text-[9px] text-cyan-400/80 font-mono">
+                                🛡️ {ev.mitre_id}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 whitespace-nowrap">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -339,8 +354,13 @@ export default function CyberShieldView() {
                             {ev.severity}
                           </span>
                         </td>
-                        <td className="py-3 text-gray-400 text-[11px] max-w-xs truncate" title={ev.details}>
-                          {ev.details}
+                        <td className="py-3 text-gray-400 text-[11px] max-w-xs">
+                          <p className="truncate" title={ev.details}>{ev.details}</p>
+                          {ev.sha256_fingerprint && (
+                            <span className="text-[9px] font-mono text-gray-600 block">
+                              HMAC-SHA256: {ev.sha256_fingerprint}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 text-gray-500 text-[10px] whitespace-nowrap">
                           {ev.timestamp}
